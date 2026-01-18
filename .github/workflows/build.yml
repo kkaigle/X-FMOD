@@ -24,7 +24,6 @@ jobs:
         cache: 'pip'
 
     - name: Install dependencies
-      # We need to install specific platform dependencies for pywebview/pyinstaller
       run: |
         pip install -r requirements.txt
 
@@ -38,9 +37,29 @@ jobs:
       run: |
         pyinstaller --name "X-FMOD Toolkit" --onefile --noconsole --add-data "X-FMOD.html${{ runner.os == 'Windows' && ';' || ':' }}." app.py
 
+    # --- Windows Installer ---
+    - name: Compile Windows Installer
+      if: runner.os == 'Windows'
+      uses: Minisign/run-inno-setup-action@v1.2.0
+      with:
+        path: installer/setup.iss
+        
+    # --- macOS DMG ---
+    - name: Create DMG
+      if: runner.os == 'macOS'
+      run: |
+        npm install -g create-dmg
+        mkdir -p dist/dmg
+        create-dmg "dist/X-FMOD Toolkit.app" dist/dmg || true
+        mv "dist/X-FMOD Toolkit 1.0.0.dmg" "dist/X-FMOD-Toolkit.dmg"
+
+    # --- Upload Artifacts ---
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: X-FMOD-Toolkit-${{ runner.os }}
-        path: dist/
-        if-no-files-found: error
+        path: |
+          dist/X-FMOD*Toolkit*Setup.exe
+          dist/*.dmg
+          dist/X-FMOD Toolkit
+        if-no-files-found: ignore
