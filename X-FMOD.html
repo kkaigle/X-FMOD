@@ -1903,11 +1903,17 @@
                 }
 
                 progressFill.style.width = '60%';
-                log('Built command-to-coordinate mapping', 'info', 'consoleUpdate');
+                log('Built command-to-coordinate mapping. Identifying changes...', 'info', 'consoleUpdate');
 
                 // Identify Changes (Don't update yet)
                 const updater = new SNDUpdater(sndFileContent);
-                const results = updater.identifyChanges(commandMap);
+                let results;
+
+                try {
+                    results = updater.identifyChanges(commandMap);
+                } catch (e) {
+                    throw new Error("Failed to identify changes: " + e.message);
+                }
 
                 progressFill.style.width = '90%';
 
@@ -1915,18 +1921,32 @@
                     log('No coordinate changes needed. Files match.', 'success', 'consoleUpdate');
                     document.getElementById('updateBtn').disabled = false;
                     progressFill.style.width = '100%';
+
+                    setTimeout(() => {
+                        progressBar.classList.add('hidden');
+                        progressFill.style.width = '0';
+                    }, 1500);
                     return;
                 }
 
                 log(`Found ${results.changes.length} potential updates. Opening comparison...`, 'info', 'consoleUpdate');
 
-                openCompareModal(results.changes, results.totalEntries, results.matched, results.unmatched);
+                try {
+                    openCompareModal(results.changes, results.totalEntries, results.matched, results.unmatched);
+                } catch (e) {
+                    throw new Error("Failed to open comparison view: " + e.message);
+                }
 
                 // Note: The workflow pauses here until user clicks "Finalize" in modal
 
             } catch (error) {
+                console.error(error);
                 log('ERROR: ' + error.message, 'error', 'consoleUpdate');
-                progressFill.style.width = '0';
+                if (error.stack) {
+                    console.error(error.stack);
+                    log('Stack: ' + error.stack.split('\n')[0], 'error', 'consoleUpdate');
+                }
+                progressFill.style.width = '0%';
                 setTimeout(() => progressBar.classList.add('hidden'), 500);
                 document.getElementById('updateBtn').disabled = false;
             }
