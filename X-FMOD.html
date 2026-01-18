@@ -1186,6 +1186,141 @@
             padding-top: 1rem;
             border-top: 1px solid var(--border);
         }
+
+        /* Resources & Help Hub Styles */
+        .resource-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .resource-item {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            padding: 1.25rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .resource-item:hover {
+            border-color: var(--primary);
+            background: var(--bg-secondary);
+            transform: translateX(8px);
+            box-shadow: var(--shadow);
+        }
+
+        .resource-item::after {
+            content: '↗';
+            position: absolute;
+            right: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: all 0.3s;
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+
+        .resource-item:hover::after {
+            opacity: 1;
+            right: 1.5rem;
+        }
+
+        .resource-icon {
+            font-size: 1.75rem;
+            width: 50px;
+            height: 50px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .resource-item:hover .resource-icon {
+            border-color: var(--primary);
+            background: var(--bg-tertiary);
+            transform: scale(1.1);
+        }
+
+        .resource-name {
+            font-weight: 700;
+            color: var(--text);
+            font-size: 1.05rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .resource-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .tutorial-card {
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-card) 100%);
+            padding: 2rem;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            position: relative;
+            transition: all 0.4s ease;
+        }
+
+        .tutorial-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .tutorial-tag {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.25rem;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .tutorial-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .tutorial-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.75rem;
+            line-height: 1.6;
+        }
+
+        .tutorial-link {
+            display: inline-block;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .tutorial-link:hover {
+            color: var(--primary);
+            letter-spacing: 0.05em;
+        }
     </style>
 </head>
 
@@ -1216,11 +1351,7 @@
                     Update XYZ Coordinates
                 </button>
                 <button class="mode-btn" onclick="switchMode('fmod')" id="fmodModeBtn">
-                    <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
-                        FMOD Package Export
-                        <span
-                            style="background: var(--warning); color: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">EXPERIMENTAL</span>
-                    </span>
+                    Resources & Help
                 </button>
             </div>
 
@@ -1627,116 +1758,84 @@
             </div>
         </div>
 
-        <!-- FMOD PACKAGE EXPORT MODE -->
+        <!-- RESOURCES & HELP MODE -->
         <div id="fmodContent" class="hidden">
             <div class="grid">
-                <!-- File Upload Section for FMOD Mode -->
+                <!-- Official Documentation Section -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">Input File</span>
+                        <span class="card-title">Official Documentation</span>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">SND File *</label>
-                        <div class="drop-zone" id="sndDropZoneFmod">
-                            <div class="drop-text">Drop your .snd file here</div>
-                            <div class="drop-subtext">will extract event structure</div>
-                        </div>
-                        <input type="file" id="sndFileFmod" accept=".snd" style="display: none;">
-                        <div id="sndFileInfoFmod" class="hidden"></div>
-                    </div>
-
-                    <div
-                        style="padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--warning); margin-top: 1rem;">
-                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            <strong style="color: var(--warning);">Experimental Feature</strong>
-                        </div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;">
-                            This creates a ZIP file containing the FMOD folder structure based on event paths in your
-                            .snd file. You can extract this directly into your FMOD project's Events folder.
-                        </div>
+                    <div class="resource-list">
+                        <a href="https://developer.x-plane.com/article/fmod-in-x-plane-getting-started/" target="_blank"
+                            class="resource-item">
+                            <div class="resource-icon">📖</div>
+                            <div class="resource-info">
+                                <div class="resource-name">X-Plane FMOD Guide</div>
+                                <div class="resource-desc">The official "Getting Started" guide for X-Plane developers.
+                                </div>
+                            </div>
+                        </a>
+                        <a href="https://fmod.com/docs/2.02/studio/welcome-to-fmod-studio.html" target="_blank"
+                            class="resource-item">
+                            <div class="resource-icon">📚</div>
+                            <div class="resource-info">
+                                <div class="resource-name">FMOD Studio Manual</div>
+                                <div class="resource-desc">Complete user manual for the FMOD Studio application.</div>
+                            </div>
+                        </a>
                     </div>
                 </div>
 
-                <!-- FMOD Options -->
+                <!-- Essential Tools Section -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">Package Options</span>
+                        <span class="card-title">Essential Tools</span>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="packageName">Package Name</label>
-                        <input type="text" id="packageName" value="aircraft_sounds" placeholder="e.g., aircraft_sounds">
-                    </div>
-
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="createPlaceholders" checked>
-                        <label for="createPlaceholders">Create Placeholder Audio Files</label>
-                        <span class="info-icon" title="Creates empty .wav files as placeholders for each event">?</span>
-                    </div>
-
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="includeReadme" checked>
-                        <label for="includeReadme">Include README.txt</label>
-                        <span class="info-icon" title="Adds instructions for using the package">?</span>
-                    </div>
-
-                    <div style="padding: 1rem; background: var(--bg-tertiary); border-radius: 6px; margin-top: 1rem;">
-                        <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
-                            <strong style="color: var(--accent);">FMOD Structure:</strong><br>
-                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;">
-                                /aircraft/generic/switch/ → switch.wav<br>
-                                /aircraft/engine/running/ → running.wav<br>
-                                /aircraft/warning/stall/ → stall.wav
-                            </span>
-                        </div>
+                    <div class="resource-list">
+                        <a href="https://fmod.com/download" target="_blank" class="resource-item">
+                            <div class="resource-icon">🛠️</div>
+                            <div class="resource-info">
+                                <div class="resource-name">FMOD Studio Download</div>
+                                <div class="resource-desc">Download FMOD Studio 2.02.x (required for X-Plane).</div>
+                            </div>
+                        </a>
+                        <a href="#" onclick="alert('Stay tuned! Detailed documentation for X-FMOD is coming soon.')"
+                            class="resource-item">
+                            <div class="resource-icon">🛸</div>
+                            <div class="resource-info">
+                                <div class="resource-name">X-FMOD Usage Guide</div>
+                                <div class="resource-desc">Internal guide on how to use all X-FMOD features.</div>
+                            </div>
+                        </a>
                     </div>
                 </div>
 
-                <!-- Export Button -->
+                <!-- Community & Tutorials Section -->
                 <div class="card full-width">
-                    <button class="btn" id="fmodExportBtn" onclick="exportFMODPackage()">
-                        Export FMOD Package
-                    </button>
-                    <div class="progress-bar hidden" id="progressBarFmod">
-                        <div class="progress-fill" id="progressFillFmod"></div>
-                    </div>
-                </div>
-
-                <!-- FMOD Output Section -->
-                <div class="card full-width hidden" id="outputSectionFmod">
                     <div class="card-header">
-                        <span class="card-title">Package Results</span>
+                        <span class="card-title">Community & Tutorials</span>
                     </div>
-
-                    <div class="stats hidden" id="statsGridFmod">
-                        <div class="stat">
-                            <div class="stat-value" id="statEventsFound">0</div>
-                            <div class="stat-label">Events Found</div>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                        <div class="tutorial-card">
+                            <div class="tutorial-tag">VIDEO</div>
+                            <h3 class="tutorial-title">FMOD Workflow in X-Plane</h3>
+                            <p class="tutorial-desc">Learn the basic workflow from cockpit.obj to FMOD project and .snd
+                                file.</p>
+                            <a href="https://www.youtube.com/results?search_query=x-plane+fmod+tutorial" target="_blank"
+                                class="tutorial-link">Search Tutorials →</a>
                         </div>
-                        <div class="stat">
-                            <div class="stat-value" id="statFolders">0</div>
-                            <div class="stat-label">Folders Created</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" id="statFiles">0</div>
-                            <div class="stat-label">Files Generated</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" id="statPackageSize">0 KB</div>
-                            <div class="stat-label">Package Size</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" id="statTimeFmod">0ms</div>
-                            <div class="stat-label">Time</div>
+                        <div class="tutorial-card">
+                            <div class="tutorial-tag">FORUM</div>
+                            <h3 class="tutorial-title">X-Plane.org Developer Forum</h3>
+                            <h3 class="tutorial-title"></h3>
+                            <p class="tutorial-desc">Ask questions and share advice with fellow X-Plane sound designers.
+                            </p>
+                            <a href="https://forums.x-plane.org/index.php?/forums/forum/154-aircraft-sound-design/"
+                                target="_blank" class="tutorial-link">Visit Forum →</a>
                         </div>
                     </div>
-
-                    <div class="console" id="consoleFmod"></div>
-
-                    <button class="btn btn-success hidden" id="downloadBtnFmod">
-                        Download FMOD Package (.zip)
-                    </button>
                 </div>
             </div>
         </div>
@@ -1833,7 +1932,7 @@
             } else if (mode === 'fmod') {
                 fmodBtn.classList.add('active');
                 fmodContent.classList.remove('hidden');
-                modeDesc.innerHTML = '<strong style="color: var(--warning);">EXPERIMENTAL:</strong> Generate FMOD Studio project structure from .snd file. Creates folder hierarchy matching event paths so you can drag-and-drop into your FMOD project.';
+                modeDesc.innerHTML = 'FMOD Documentation, tutorials, and community resources to help you build great sounds for X-Plane.';
             }
         }
 
