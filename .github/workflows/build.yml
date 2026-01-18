@@ -44,14 +44,10 @@ jobs:
         choco install innosetup
         & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/setup.iss
         
-    # --- macOS DMG ---
     - name: Create DMG
       if: runner.os == 'macOS'
       run: |
-        npm install -g create-dmg
-        mkdir -p dist/dmg
-        create-dmg "dist/X-FMOD Toolkit.app" dist/dmg || true
-        mv "dist/X-FMOD Toolkit 1.0.0.dmg" "dist/X-FMOD-Toolkit.dmg"
+        hdiutil create -volname "X-FMOD Toolkit" -srcfolder "dist/X-FMOD Toolkit.app" -ov -format UDZO "dist/X-FMOD-Toolkit.dmg"
 
     # --- Upload Artifacts ---
     - name: Upload Artifacts
