@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>X-FMOD - Professional X-Plane FMOD Toolkit by MACLine Dynamics</title>
+    <title>X-FMOD - X-Plane FMOD Toolkit by MACLine Dynamics</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         :root {
             --primary: #3b82f6;
             --primary-hover: #2563eb;
@@ -21,26 +22,26 @@
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            
+
             --bg-primary: #0f1419;
             --bg-secondary: #1a1f2e;
             --bg-tertiary: #232938;
             --bg-card: #1e2533;
             --bg-hover: #252d3d;
-            
+
             --border: #2d3748;
             --border-light: #374151;
-            
+
             --text: #e2e8f0;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
-            
+
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
             --shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
             --glow: 0 0 20px rgba(59, 130, 246, 0.15);
         }
-        
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg-primary);
@@ -49,12 +50,12 @@
             padding: 2rem;
             min-height: 100vh;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
         }
-        
+
         header {
             background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
             border: 1px solid var(--border);
@@ -65,7 +66,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         header::before {
             content: '';
             position: absolute;
@@ -75,14 +76,14 @@
             height: 3px;
             background: linear-gradient(90deg, var(--primary), var(--accent));
         }
-        
+
         h1 {
             font-size: 1.75rem;
             font-weight: 700;
             color: var(--text);
             margin-bottom: 0.5rem;
         }
-        
+
         .subtitle {
             font-size: 0.95rem;
             color: var(--text-secondary);
@@ -134,20 +135,20 @@
             font-size: 0.875rem;
             color: var(--text-secondary);
         }
-        
+
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
             margin-bottom: 1.5rem;
         }
-        
+
         @media (max-width: 1024px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -156,12 +157,12 @@
             box-shadow: var(--shadow);
             transition: all 0.3s ease;
         }
-        
+
         .card:hover {
             border-color: var(--border-light);
             box-shadow: var(--shadow-lg);
         }
-        
+
         .card-header {
             display: flex;
             align-items: center;
@@ -170,7 +171,7 @@
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .card-title {
             font-size: 0.9rem;
             font-weight: 600;
@@ -178,7 +179,7 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
+
         .drop-zone {
             border: 2px dashed var(--border);
             border-radius: 8px;
@@ -189,31 +190,31 @@
             background: var(--bg-secondary);
             position: relative;
         }
-        
+
         .drop-zone:hover {
             border-color: var(--primary);
             background: var(--bg-tertiary);
             box-shadow: var(--glow);
         }
-        
+
         .drop-zone.drag-over {
             border-color: var(--accent);
             background: rgba(59, 130, 246, 0.1);
             box-shadow: var(--glow);
         }
-        
+
         .drop-text {
             font-size: 0.95rem;
             font-weight: 500;
             color: var(--text);
             margin-bottom: 0.25rem;
         }
-        
+
         .drop-subtext {
             font-size: 0.8rem;
             color: var(--text-secondary);
         }
-        
+
         .file-info {
             background: var(--bg-tertiary);
             padding: 0.875rem;
@@ -224,7 +225,7 @@
             justify-content: space-between;
             border: 1px solid var(--border);
         }
-        
+
         .file-name {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.8rem;
@@ -233,12 +234,12 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .file-size {
             color: var(--text-muted);
             font-size: 0.75rem;
         }
-        
+
         .remove-btn {
             background: none;
             border: none;
@@ -250,11 +251,11 @@
             line-height: 1;
             transition: all 0.2s;
         }
-        
+
         .remove-btn:hover {
             background: rgba(239, 68, 68, 0.15);
         }
-        
+
         .section-title {
             font-size: 0.75rem;
             font-weight: 600;
@@ -266,11 +267,11 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .section-title:first-child {
             margin-top: 0;
         }
-        
+
         .section-title::before {
             content: '';
             width: 3px;
@@ -278,13 +279,13 @@
             background: var(--primary);
             border-radius: 2px;
         }
-        
+
         .checkbox-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 0.625rem;
         }
-        
+
         .checkbox-item {
             display: flex;
             align-items: center;
@@ -296,19 +297,19 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .checkbox-item:hover {
             background: var(--bg-hover);
             border-color: var(--border-light);
         }
-        
+
         .checkbox-item input[type="checkbox"] {
             width: 16px;
             height: 16px;
             cursor: pointer;
             accent-color: var(--primary);
         }
-        
+
         .checkbox-item label {
             font-size: 0.875rem;
             cursor: pointer;
@@ -316,15 +317,15 @@
             color: var(--text-secondary);
             font-weight: 400;
         }
-        
-        .checkbox-item input:checked + label {
+
+        .checkbox-item input:checked+label {
             color: var(--text);
         }
-        
+
         .form-group {
             margin-bottom: 1rem;
         }
-        
+
         .form-label {
             display: block;
             font-size: 0.8rem;
@@ -334,7 +335,7 @@
             letter-spacing: 0.05em;
             margin-bottom: 0.5rem;
         }
-        
+
         input[type="text"],
         select {
             width: 100%;
@@ -347,7 +348,7 @@
             color: var(--text);
             transition: all 0.2s;
         }
-        
+
         input[type="text"]:focus,
         select:focus {
             outline: none;
@@ -355,7 +356,7 @@
             background: var(--bg-tertiary);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
-        
+
         .btn {
             width: 100%;
             padding: 0.875rem 1.5rem;
@@ -371,33 +372,33 @@
             letter-spacing: 0.05em;
             box-shadow: var(--shadow), 0 0 20px rgba(59, 130, 246, 0.2);
         }
-        
+
         .btn:hover {
             background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary-dark) 100%);
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg), 0 0 30px rgba(59, 130, 246, 0.3);
         }
-        
+
         .btn:active {
             transform: translateY(0);
         }
-        
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-        
+
         .btn-success {
             background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
             box-shadow: var(--shadow), 0 0 20px rgba(16, 185, 129, 0.2);
         }
-        
+
         .btn-success:hover {
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
             box-shadow: var(--shadow-lg), 0 0 30px rgba(16, 185, 129, 0.3);
         }
-        
+
         .progress-bar {
             height: 6px;
             background: var(--bg-tertiary);
@@ -406,7 +407,7 @@
             margin: 1rem 0;
             border: 1px solid var(--border);
         }
-        
+
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--primary), var(--accent));
@@ -414,7 +415,7 @@
             transition: width 0.3s ease;
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
-        
+
         .console {
             background: #0a0e14;
             color: #e5e9f0;
@@ -429,31 +430,42 @@
             margin-bottom: 1rem;
             box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
         }
-        
+
         .console-line {
             margin-bottom: 0.25rem;
             opacity: 0;
             animation: fadeInConsole 0.3s ease-out forwards;
         }
-        
+
         @keyframes fadeInConsole {
             to {
                 opacity: 1;
             }
         }
-        
-        .console-line.success { color: #a3be8c; }
-        .console-line.error { color: #bf616a; }
-        .console-line.warning { color: #ebcb8b; }
-        .console-line.info { color: #88c0d0; }
-        
+
+        .console-line.success {
+            color: #a3be8c;
+        }
+
+        .console-line.error {
+            color: #bf616a;
+        }
+
+        .console-line.warning {
+            color: #ebcb8b;
+        }
+
+        .console-line.info {
+            color: #88c0d0;
+        }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 0.875rem;
             margin-bottom: 1.25rem;
         }
-        
+
         .stat {
             background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
             padding: 1rem;
@@ -462,13 +474,13 @@
             border: 1px solid var(--border);
             transition: all 0.3s ease;
         }
-        
+
         .stat:hover {
             border-color: var(--primary);
             box-shadow: var(--glow);
             transform: translateY(-2px);
         }
-        
+
         .stat-value {
             font-size: 1.75rem;
             font-weight: 700;
@@ -477,7 +489,7 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
+
         .stat-label {
             font-size: 0.65rem;
             color: var(--text-muted);
@@ -485,15 +497,15 @@
             letter-spacing: 0.05em;
             margin-top: 0.375rem;
         }
-        
+
         .hidden {
             display: none;
         }
-        
+
         .full-width {
             grid-column: 1 / -1;
         }
-        
+
         .info-icon {
             display: inline-block;
             width: 16px;
@@ -509,13 +521,13 @@
             border: 1px solid var(--border);
             transition: all 0.2s;
         }
-        
+
         .info-icon:hover {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
         }
-        
+
         footer {
             text-align: center;
             margin-top: 2.5rem;
@@ -524,22 +536,22 @@
             color: var(--text-muted);
             font-size: 0.8rem;
         }
-        
+
         ::-webkit-scrollbar {
             width: 10px;
             height: 10px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: var(--bg-secondary);
             border-radius: 5px;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: var(--border);
             border-radius: 5px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background: var(--border-light);
         }
@@ -549,6 +561,7 @@
                 opacity: 0;
                 transform: translateY(10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -559,10 +572,21 @@
             animation: slideIn 0.4s ease-out backwards;
         }
 
-        .card:nth-child(1) { animation-delay: 0.05s; }
-        .card:nth-child(2) { animation-delay: 0.1s; }
-        .card:nth-child(3) { animation-delay: 0.15s; }
-        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(1) {
+            animation-delay: 0.05s;
+        }
+
+        .card:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .card:nth-child(3) {
+            animation-delay: 0.15s;
+        }
+
+        .card:nth-child(4) {
+            animation-delay: 0.2s;
+        }
 
         /* Review Modal Styles */
         .review-modal {
@@ -890,8 +914,13 @@
         }
 
         @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
         }
 
         .beta-badge-large {
@@ -956,6 +985,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- Beta Banner -->
@@ -966,14 +996,11 @@
                 <div class="macline-credit">By MACLine Dynamics</div>
             </div>
             <div class="beta-subtext">
-                Professional X-Plane FMOD sound toolkit for aircraft developers • Review & Customize feature now included!
+                X-Plane FMOD sound toolkit for aircraft developers • Review & Customize feature now included!
             </div>
         </div>
 
         <header>
-            <h1 class="xfmod-title">X-FMOD</h1>
-            <p class="subtitle">Professional X-Plane FMOD sound toolkit • Generate, update, and customize with precision</p>
-            
             <div class="mode-selector">
                 <button class="mode-btn active" onclick="switchMode('generate')" id="generateModeBtn">
                     <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -987,7 +1014,8 @@
                 <button class="mode-btn" onclick="switchMode('fmod')" id="fmodModeBtn">
                     <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
                         FMOD Package Export
-                        <span style="background: var(--warning); color: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">EXPERIMENTAL</span>
+                        <span
+                            style="background: var(--warning); color: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">EXPERIMENTAL</span>
                     </span>
                 </button>
             </div>
@@ -1005,7 +1033,7 @@
                     <div class="card-header">
                         <span class="card-title">Input Files</span>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Cockpit OBJ File *</label>
                         <div class="drop-zone" id="objDropZone">
@@ -1198,7 +1226,7 @@
                     <div class="card-header">
                         <span class="card-title">Generation Results</span>
                     </div>
-                    
+
                     <div class="stats hidden" id="statsGrid">
                         <div class="stat">
                             <div class="stat-value" id="statVertices">0</div>
@@ -1231,7 +1259,7 @@
                     </div>
 
                     <div class="console" id="console"></div>
-                    
+
                     <button class="btn btn-success hidden" id="downloadBtn">
                         Download .SND File
                     </button>
@@ -1247,7 +1275,7 @@
                     <div class="card-header">
                         <span class="card-title">Input Files</span>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Cockpit OBJ File *</label>
                         <div class="drop-zone" id="objDropZoneUpdate">
@@ -1280,12 +1308,15 @@
                         <input type="text" id="outputNameUpdate" value="updated_sounds.snd">
                     </div>
 
-                    <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--warning);">
+                    <div
+                        style="padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--warning);">
                         <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                             <strong style="color: var(--warning);">How it works:</strong>
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;">
-                            The tool matches commands in your .snd file with manipulators in the cockpit.obj and updates the VEH_XYZ coordinates. This fixes the Y/Z axis flip between Blender and X-Plane automatically.
+                            The tool matches commands in your .snd file with manipulators in the cockpit.obj and updates
+                            the VEH_XYZ coordinates. This fixes the Y/Z axis flip between Blender and X-Plane
+                            automatically.
                         </div>
                     </div>
                 </div>
@@ -1305,7 +1336,7 @@
                     <div class="card-header">
                         <span class="card-title">Update Results</span>
                     </div>
-                    
+
                     <div class="stats hidden" id="statsGridUpdate">
                         <div class="stat">
                             <div class="stat-value" id="statEntriesFound">0</div>
@@ -1330,7 +1361,7 @@
                     </div>
 
                     <div class="console" id="consoleUpdate"></div>
-                    
+
                     <button class="btn btn-success hidden" id="downloadBtnUpdate">
                         Download Updated .SND File
                     </button>
@@ -1346,7 +1377,7 @@
                     <div class="card-header">
                         <span class="card-title">Input File</span>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">SND File *</label>
                         <div class="drop-zone" id="sndDropZoneFmod">
@@ -1357,12 +1388,14 @@
                         <div id="sndFileInfoFmod" class="hidden"></div>
                     </div>
 
-                    <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--warning); margin-top: 1rem;">
+                    <div
+                        style="padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--warning); margin-top: 1rem;">
                         <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                             <strong style="color: var(--warning);">Experimental Feature</strong>
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;">
-                            This creates a ZIP file containing the FMOD folder structure based on event paths in your .snd file. You can extract this directly into your FMOD project's Events folder.
+                            This creates a ZIP file containing the FMOD folder structure based on event paths in your
+                            .snd file. You can extract this directly into your FMOD project's Events folder.
                         </div>
                     </div>
                 </div>
@@ -1394,9 +1427,9 @@
                         <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
                             <strong style="color: var(--accent);">FMOD Structure:</strong><br>
                             <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;">
-                            /aircraft/generic/switch/ → switch.wav<br>
-                            /aircraft/engine/running/ → running.wav<br>
-                            /aircraft/warning/stall/ → stall.wav
+                                /aircraft/generic/switch/ → switch.wav<br>
+                                /aircraft/engine/running/ → running.wav<br>
+                                /aircraft/warning/stall/ → stall.wav
                             </span>
                         </div>
                     </div>
@@ -1417,7 +1450,7 @@
                     <div class="card-header">
                         <span class="card-title">Package Results</span>
                     </div>
-                    
+
                     <div class="stats hidden" id="statsGridFmod">
                         <div class="stat">
                             <div class="stat-value" id="statEventsFound">0</div>
@@ -1442,7 +1475,7 @@
                     </div>
 
                     <div class="console" id="consoleFmod"></div>
-                    
+
                     <button class="btn btn-success hidden" id="downloadBtnFmod">
                         Download FMOD Package (.zip)
                     </button>
@@ -1455,23 +1488,28 @@
             <div class="review-container">
                 <div class="review-header">
                     <h2>Review & Customize Sound Configuration</h2>
-                    <p>Edit event names, triggers, and conditions. Delete unwanted entries. Click on any field to customize.</p>
+                    <p>Edit event names, triggers, and conditions. Delete unwanted entries. Click on any field to
+                        customize.</p>
                     <div class="review-filters">
-                        <button class="filter-btn active" onclick="filterEntries('all')">All (<span id="countAll">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('template')">Templates (<span id="countTemplate">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('manip')">Manipulators (<span id="countManip">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('deleted')">Deleted (<span id="countDeleted">0</span>)</button>
+                        <button class="filter-btn active" onclick="filterEntries('all')">All (<span
+                                id="countAll">0</span>)</button>
+                        <button class="filter-btn" onclick="filterEntries('template')">Templates (<span
+                                id="countTemplate">0</span>)</button>
+                        <button class="filter-btn" onclick="filterEntries('manip')">Manipulators (<span
+                                id="countManip">0</span>)</button>
+                        <button class="filter-btn" onclick="filterEntries('deleted')">Deleted (<span
+                                id="countDeleted">0</span>)</button>
                     </div>
                 </div>
-                
+
                 <div class="review-body" id="reviewBody">
                     <!-- Entries will be inserted here -->
                 </div>
-                
+
                 <div class="review-footer">
                     <div class="review-stats">
-                        Total: <strong id="totalEntries">0</strong> entries | 
-                        Active: <strong id="activeEntries">0</strong> | 
+                        Total: <strong id="totalEntries">0</strong> entries |
+                        Active: <strong id="activeEntries">0</strong> |
                         Deleted: <strong id="deletedEntries">0</strong>
                     </div>
                     <div class="review-footer-actions">
@@ -1484,10 +1522,12 @@
 
         <footer>
             <div style="margin-bottom: 0.75rem;">
-                <span class="xfmod-title" style="font-size: 1rem;">X-FMOD</span> by <strong>MACLine Dynamics</strong> • Professional X-Plane FMOD Toolkit • Zero installation required
+                <span class="xfmod-title" style="font-size: 1rem;">X-FMOD</span> by <strong>MACLine Dynamics</strong> •
+                Professional X-Plane FMOD Toolkit • Zero installation required
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted);">
-                Report any issues to <a href="mailto:maclinedynamics@gmail.com" style="color: var(--primary); text-decoration: none;">maclinedynamics@gmail.com</a>
+                Report any issues to <a href="mailto:maclinedynamics@gmail.com"
+                    style="color: var(--primary); text-decoration: none;">maclinedynamics@gmail.com</a>
             </div>
         </footer>
     </div>
@@ -1498,7 +1538,7 @@
         let templateFileContent = null;
         let generatedContent = null;
         let currentMode = 'generate';
-        
+
         // Review system state
         let soundEntries = [];
         let currentFilter = 'all';
@@ -1507,7 +1547,7 @@
         // Mode switching
         function switchMode(mode) {
             currentMode = mode;
-            
+
             const generateBtn = document.getElementById('generateModeBtn');
             const updateBtn = document.getElementById('updateModeBtn');
             const fmodBtn = document.getElementById('fmodModeBtn');
@@ -1515,7 +1555,7 @@
             const updateContent = document.getElementById('updateContent');
             const fmodContent = document.getElementById('fmodContent');
             const modeDesc = document.getElementById('modeDescription');
-            
+
             // Remove all active states
             generateBtn.classList.remove('active');
             updateBtn.classList.remove('active');
@@ -1523,7 +1563,7 @@
             generateContent.classList.add('hidden');
             updateContent.classList.add('hidden');
             fmodContent.classList.add('hidden');
-            
+
             if (mode === 'generate') {
                 generateBtn.classList.add('active');
                 generateContent.classList.remove('hidden');
@@ -1540,17 +1580,17 @@
         }
 
         // Event name selector
-        document.getElementById('eventName').addEventListener('change', function() {
+        document.getElementById('eventName').addEventListener('change', function () {
             const customGroup = document.getElementById('customEventGroup');
             customGroup.classList.toggle('hidden', this.value !== 'custom');
         });
-        
+
         // File drop zones for GENERATE mode
         setupDropZone('objDropZone', 'objFile', (content, filename) => {
             objFileContent = content;
             showFileInfo('objFileInfo', filename, content.length);
         });
-        
+
         setupDropZone('templateDropZone', 'templateFile', (content, filename) => {
             templateFileContent = content;
             showFileInfo('templateFileInfo', filename, content.length);
@@ -1579,45 +1619,45 @@
             sndFileFmodContent = content;
             showFileInfo('sndFileInfoFmod', filename, content.length);
         });
-        
+
         function setupDropZone(dropZoneId, inputId, callback) {
             const dropZone = document.getElementById(dropZoneId);
             const fileInput = document.getElementById(inputId);
-            
+
             dropZone.addEventListener('click', () => fileInput.click());
-            
+
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 dropZone.classList.add('drag-over');
             });
-            
+
             dropZone.addEventListener('dragleave', () => {
                 dropZone.classList.remove('drag-over');
             });
-            
+
             dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('drag-over');
                 const file = e.dataTransfer.files[0];
                 if (file) readFile(file, callback);
             });
-            
+
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) readFile(file, callback);
             });
         }
-        
+
         function readFile(file, callback) {
             const reader = new FileReader();
             reader.onload = (e) => callback(e.target.result, file.name);
             reader.readAsText(file);
         }
-        
+
         function showFileInfo(elementId, filename, size) {
             const element = document.getElementById(elementId);
             const sizeKB = (size / 1024).toFixed(1);
-            
+
             let fileType = 'template';
             if (elementId.includes('Update') || elementId.includes('update')) {
                 fileType = 'update';
@@ -1628,7 +1668,7 @@
             } else if (elementId === 'objFileInfo') {
                 fileType = 'obj';
             }
-            
+
             element.innerHTML = `
                 <div class="file-info">
                     <div>
@@ -1643,7 +1683,7 @@
             `;
             element.classList.remove('hidden');
         }
-        
+
         function removeFile(infoId, type) {
             document.getElementById(infoId).classList.add('hidden');
             if (type === 'obj') {
@@ -1663,7 +1703,7 @@
                 document.getElementById('sndFileFmod').value = '';
             }
         }
-        
+
         function log(message, type = 'info', consoleId = 'console') {
             const console = document.getElementById(consoleId);
             const line = document.createElement('div');
@@ -1673,11 +1713,11 @@
             console.appendChild(line);
             console.scrollTop = console.scrollHeight;
         }
-        
+
         function clearConsole(consoleId = 'console') {
             document.getElementById(consoleId).innerHTML = '';
         }
-        
+
         function getFilterSettings() {
             return {
                 excludeDragAxis: document.getElementById('excludeDragAxis').checked,
@@ -1686,7 +1726,7 @@
                 excludeNoop: document.getElementById('excludeNoop').checked
             };
         }
-        
+
         function getTemplateSoundSettings() {
             return {
                 engine: document.getElementById('includeEngine').checked,
@@ -1767,7 +1807,7 @@
 
                 log('Update complete!', 'success', 'consoleUpdate');
                 log(`Updated ${updateResult.updated} coordinates`, 'success', 'consoleUpdate');
-                
+
                 if (updateResult.unmatched.length > 0) {
                     log(`Warning: ${updateResult.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
                     log('Unmatched commands:', 'warning', 'consoleUpdate');
@@ -1808,11 +1848,11 @@
 
             document.getElementById('updateBtn').disabled = false;
         }
-        
+
         // ========================================================================
         // REVIEW & CUSTOMIZE SYSTEM
         // ========================================================================
-        
+
         class SoundEntry {
             constructor(data) {
                 this.id = data.id || `entry_${nextEntryId++}`;
@@ -1832,37 +1872,37 @@
                 this.isTemplate = data.isTemplate || false;
                 this.comment = data.comment || '';
             }
-            
+
             toSND() {
                 if (this.deleted) return '';
-                
+
                 let output = '';
-                
+
                 if (this.comment) {
                     output += `# ${this.comment}\n`;
                 }
-                
+
                 output += 'BEGIN_SOUND_ATTACHMENT\n';
                 output += `\tEVENT_NAME ${this.eventName}\n`;
-                
+
                 if (this.vehPart) {
                     output += `\tVEH_PART ${this.vehPart}\n`;
                 } else {
                     output += `\tVEH_XYZ ${this.xyz[0].toFixed(3)} ${this.xyz[1].toFixed(3)} ${this.xyz[2].toFixed(3)}\n`;
                 }
-                
+
                 if (this.polyphonic) {
                     output += `\tEVENT_POLYPHONIC\n`;
                 }
-                
+
                 if (this.allowedForAI) {
                     output += `\tEVENT_ALLOWED_FOR_AI\n`;
                 }
-                
+
                 if (this.paramDrefIdx !== null) {
                     output += `\tPARAM_DREF_IDX ${this.paramDrefIdx}\n`;
                 }
-                
+
                 switch (this.triggerType) {
                     case 'EVENT_START_COND':
                         if (this.startCond) output += `\tEVENT_START_COND ${this.startCond}\n`;
@@ -1884,30 +1924,30 @@
                         if (this.cueTrigger) output += `\tCUE_TRIGGER_COND ${this.cueTrigger}\n`;
                         break;
                 }
-                
+
                 if (this.autoEndCond) {
                     output += `\tEVENT_AUTO_END_FROM_START_COND ${this.autoEndCond}\n`;
                 }
-                
+
                 output += 'END_SOUND_ATTACHMENT\n\n';
                 return output;
             }
         }
-        
+
         function parseSNDToEntries(sndContent) {
             const entries = [];
             const lines = sndContent.split('\n');
             let currentEntry = null;
             let currentComment = '';
-            
+
             for (const line of lines) {
                 const trimmed = line.trim();
-                
+
                 if (trimmed.startsWith('#') && !trimmed.includes('=====')) {
                     currentComment = trimmed.substring(1).trim();
                     continue;
                 }
-                
+
                 if (trimmed === 'BEGIN_SOUND_ATTACHMENT') {
                     currentEntry = { comment: currentComment };
                     currentComment = '';
@@ -1919,8 +1959,8 @@
                 } else if (currentEntry) {
                     if (trimmed.startsWith('EVENT_NAME ')) {
                         currentEntry.eventName = trimmed.substring(11);
-                        currentEntry.isTemplate = currentEntry.eventName.includes('aircraft/') || 
-                                                 currentEntry.eventName.includes('generic/');
+                        currentEntry.isTemplate = currentEntry.eventName.includes('aircraft/') ||
+                            currentEntry.eventName.includes('generic/');
                     } else if (trimmed.startsWith('VEH_XYZ ')) {
                         const parts = trimmed.substring(8).split(/\s+/);
                         currentEntry.xyz = [parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])];
@@ -1958,41 +1998,41 @@
                     }
                 }
             }
-            
+
             return entries;
         }
-        
+
         // GENERATE MODE FUNCTION (same as before)
         async function generateSND() {
             if (!objFileContent) {
                 alert('Please upload a cockpit.obj file first!');
                 return;
             }
-            
+
             const startTime = performance.now();
-            
+
             document.getElementById('outputSection').classList.remove('hidden');
             clearConsole();
             document.getElementById('statsGrid').classList.add('hidden');
             document.getElementById('downloadBtn').classList.add('hidden');
-            
+
             const progressBar = document.getElementById('progressBar');
             const progressFill = document.getElementById('progressFill');
             progressBar.classList.remove('hidden');
             progressFill.style.width = '10%';
-            
+
             document.getElementById('generateBtn').disabled = true;
-            
+
             log('Starting generation...', 'info');
-            
+
             try {
                 const parser = new OBJParser(objFileContent);
                 const result = parser.parse();
-                
+
                 progressFill.style.width = '30%';
                 log(`Found ${result.vertices.length} vertices`, 'success');
                 log(`Found ${result.manipulators.length} manipulators`, 'success');
-                
+
                 const filters = getFilterSettings();
                 const filteredManips = result.manipulators.filter(manip => {
                     if (filters.excludeDragAxis && manip.manipType === 'drag_axis') return false;
@@ -2001,39 +2041,39 @@
                     if (filters.excludeNoop && manip.manipType === 'noop') return false;
                     return true;
                 });
-                
+
                 const filteredCount = result.manipulators.length - filteredManips.length;
                 if (filteredCount > 0) {
                     log(`Filtered out ${filteredCount} manipulators`, 'warning');
                 }
-                
+
                 progressFill.style.width = '60%';
-                
+
                 let eventName = document.getElementById('eventName').value;
                 if (eventName === 'custom') {
                     eventName = document.getElementById('customEventName').value || '/aircraft/generic/switch';
                 }
-                
+
                 const useHoldCue = document.getElementById('useHoldCue').checked;
                 const duplicateForRelease = document.getElementById('duplicateForRelease').checked;
                 const outputFilename = document.getElementById('outputName').value || 'output.snd';
-                
+
                 const generator = new SNDGenerator(templateFileContent);
                 const templateSounds = getTemplateSoundSettings();
                 generatedContent = generator.generate(filteredManips, eventName, useHoldCue, duplicateForRelease, templateSounds);
-                
+
                 progressFill.style.width = '100%';
-                
+
                 const endTime = performance.now();
                 const processingTime = Math.round(endTime - startTime);
-                
+
                 log('Generation complete!', 'success');
-                
+
                 const uniqueCommands = new Set(filteredManips.map(m => m.command)).size;
                 const templateCount = Object.values(templateSounds).filter(v => v).length;
                 const duplicatedCount = duplicateForRelease ? uniqueCommands * 2 : uniqueCommands;
                 const totalEntries = duplicatedCount + templateCount;
-                
+
                 document.getElementById('statVertices').textContent = result.vertices.length.toLocaleString();
                 document.getElementById('statManipulators').textContent = result.manipulators.length.toLocaleString();
                 document.getElementById('statFiltered').textContent = uniqueCommands.toLocaleString();
@@ -2042,31 +2082,31 @@
                 document.getElementById('statTotal').textContent = totalEntries.toLocaleString();
                 document.getElementById('statTime').textContent = processingTime + 'ms';
                 document.getElementById('statsGrid').classList.remove('hidden');
-                
+
                 // Parse generated content into entries and show review modal
                 soundEntries = parseSNDToEntries(generatedContent);
-                
+
                 const downloadBtn = document.getElementById('downloadBtn');
                 downloadBtn.classList.remove('hidden');
                 downloadBtn.textContent = 'Review & Customize';
                 downloadBtn.onclick = () => openReviewModal(outputFilename);
-                
+
                 log(`Generated ${totalEntries} total sound entries - Click "Review & Customize" to edit`, 'info');
-                
+
                 setTimeout(() => {
                     progressBar.classList.add('hidden');
                     progressFill.style.width = '0';
                 }, 500);
-                
+
             } catch (error) {
                 log('ERROR: ' + error.message, 'error');
                 progressFill.style.width = '0';
                 setTimeout(() => progressBar.classList.add('hidden'), 500);
             }
-            
+
             document.getElementById('generateBtn').disabled = false;
         }
-        
+
         function downloadFile(content, filename) {
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
@@ -2077,43 +2117,43 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             const consoleId = currentMode === 'update' ? 'consoleUpdate' : 'console';
             log('Downloaded: ' + filename, 'success', consoleId);
         }
-        
+
         // ========================================================================
         // REVIEW MODAL FUNCTIONS
         // ========================================================================
-        
+
         let currentFilename = 'aircraft_sounds.snd';
-        
+
         function openReviewModal(filename) {
             currentFilename = filename;
             renderReviewModal();
             document.getElementById('reviewModal').classList.add('active');
             document.body.style.overflow = 'hidden';
         }
-        
+
         function closeReviewModal() {
             document.getElementById('reviewModal').classList.remove('active');
             document.body.style.overflow = 'auto';
         }
-        
+
         function renderReviewModal() {
             const body = document.getElementById('reviewBody');
             body.innerHTML = '';
-            
+
             const filtered = getFilteredEntries();
-            
+
             filtered.forEach((entry, index) => {
                 const card = createEntryCard(entry, index);
                 body.appendChild(card);
             });
-            
+
             updateReviewStats();
         }
-        
+
         function getFilteredEntries() {
             switch (currentFilter) {
                 case 'template':
@@ -2127,12 +2167,12 @@
                     return soundEntries;
             }
         }
-        
+
         function createEntryCard(entry) {
             const card = document.createElement('div');
             card.className = `sound-entry ${entry.deleted ? 'deleted' : ''}`;
             card.id = `entry-${entry.id}`;
-            
+
             if (entry.deleted) {
                 card.innerHTML = `
                     <div class="entry-header">
@@ -2147,7 +2187,7 @@
                 `;
                 return card;
             }
-            
+
             card.innerHTML = `
                 <div class="entry-header">
                     <div class="entry-title">${escapeHtml(entry.comment || entry.eventName)}</div>
@@ -2206,10 +2246,10 @@
                     </div>
                 </div>
             `;
-            
+
             return card;
         }
-        
+
         function getTriggerFields(entry) {
             switch (entry.triggerType) {
                 case 'EVENT_START_COND':
@@ -2252,7 +2292,7 @@
                     return '';
             }
         }
-        
+
         function updateEntryField(entryId, field, value) {
             const entry = soundEntries.find(e => e.id === entryId);
             if (entry) {
@@ -2260,7 +2300,7 @@
                 updateReviewStats();
             }
         }
-        
+
         function deleteEntry(entryId) {
             const entry = soundEntries.find(e => e.id === entryId);
             if (entry) {
@@ -2268,7 +2308,7 @@
                 renderReviewModal();
             }
         }
-        
+
         function restoreEntry(entryId) {
             const entry = soundEntries.find(e => e.id === entryId);
             if (entry) {
@@ -2276,23 +2316,23 @@
                 renderReviewModal();
             }
         }
-        
+
         function filterEntries(filter) {
             currentFilter = filter;
-            
+
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            
+
             renderReviewModal();
         }
-        
+
         function updateReviewStats() {
             const total = soundEntries.length;
             const deleted = soundEntries.filter(e => e.deleted).length;
             const active = total - deleted;
             const template = soundEntries.filter(e => e.isTemplate && !e.deleted).length;
             const manip = soundEntries.filter(e => !e.isTemplate && !e.deleted).length;
-            
+
             document.getElementById('totalEntries').textContent = total;
             document.getElementById('activeEntries').textContent = active;
             document.getElementById('deletedEntries').textContent = deleted;
@@ -2301,29 +2341,29 @@
             document.getElementById('countManip').textContent = manip;
             document.getElementById('countDeleted').textContent = deleted;
         }
-        
+
         function downloadReviewedSND() {
             const header = generatedContent.split('BEGIN_SOUND_ATTACHMENT')[0];
             let content = header;
-            
+
             soundEntries
                 .filter(entry => !entry.deleted)
                 .forEach(entry => {
                     content += entry.toSND();
                 });
-            
+
             downloadFile(content, currentFilename);
             closeReviewModal();
-            
+
             log(`Downloaded customized .snd file with ${soundEntries.filter(e => !e.deleted).length} entries`, 'success');
         }
-        
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
         // OBJ Parser (same as before)
         class OBJParser {
             constructor(content) {
@@ -2331,28 +2371,28 @@
                 this.vertices = [];
                 this.manipulators = [];
             }
-            
+
             parse() {
                 const lines = this.content.split('\n');
-                
+
                 for (const line of lines) {
                     if (line.startsWith('VT\t') || line.startsWith('VT ')) {
                         this.parseVertex(line);
                     }
                 }
-                
+
                 let currentVertexOffset = 0;
-                
+
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
-                    
+
                     if (line.startsWith('TRIS')) {
                         const parts = line.split(/\s+/);
                         if (parts.length >= 2) {
                             currentVertexOffset = parseInt(parts[1]) || 0;
                         }
                     }
-                    
+
                     if (line.includes('ATTR_manip') && !line.includes('ATTR_manip_none')) {
                         const manip = this.parseManipulator(line, i + 1);
                         if (manip && currentVertexOffset < this.vertices.length) {
@@ -2361,13 +2401,13 @@
                         }
                     }
                 }
-                
+
                 return {
                     vertices: this.vertices,
                     manipulators: this.manipulators
                 };
             }
-            
+
             parseVertex(line) {
                 const parts = line.split(/\s+/);
                 if (parts.length >= 4) {
@@ -2379,17 +2419,17 @@
                     }
                 }
             }
-            
+
             parseManipulator(line, lineNum) {
                 const parts = line.split('\t').filter(p => p.trim());
-                
+
                 if (parts.length < 3) return null;
-                
+
                 const manipType = parts[0].replace('ATTR_manip_', '');
                 const cursor = parts[1] || 'hand';
                 const command = parts[2] || '';
                 const tooltip = parts[3] || '';
-                
+
                 return {
                     manipType,
                     cursor,
@@ -2436,7 +2476,7 @@
                     }
 
                     // Extract command from EVENT_CMND_* lines
-                    if (trimmed.startsWith('EVENT_CMND_HOLD_CUE') || 
+                    if (trimmed.startsWith('EVENT_CMND_HOLD_CUE') ||
                         trimmed.startsWith('EVENT_CMND_CUE') ||
                         trimmed.startsWith('EVENT_CMND_UP') ||
                         trimmed.startsWith('EVENT_CMND_DOWN') ||
@@ -2444,7 +2484,7 @@
                         const parts = trimmed.split(/\s+/);
                         if (parts.length >= 2) {
                             currentCommand = parts.slice(1).join(' ');
-                            
+
                             // Update the pending VEH_XYZ line if we have a match
                             if (currentCommand && pendingXYZLineIndex !== null && commandMap.has(currentCommand)) {
                                 const xyz = commandMap.get(currentCommand);
@@ -2474,13 +2514,13 @@
                 };
             }
         }
-        
+
         // SND Generator (same as before - keeping the full implementation)
         class SNDGenerator {
             constructor(templateContent) {
                 this.template = templateContent;
             }
-            
+
             getDefaultHeader() {
                 return `A
 1000
@@ -2496,17 +2536,17 @@ DISABLE_LEGACY_ALERT_SOUNDS
 
 `;
             }
-            
+
             getHeader() {
                 if (!this.template) return this.getDefaultHeader();
                 const idx = this.template.indexOf('BEGIN_SOUND_ATTACHMENT');
                 if (idx > 0) return this.template.substring(0, idx);
                 return this.getDefaultHeader();
             }
-            
+
             generateTemplateSounds(templateSounds) {
                 let output = '';
-                
+
                 if (templateSounds.engine) {
                     output += `# Engine Sound
 BEGIN_SOUND_ATTACHMENT
@@ -2519,7 +2559,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.propeller) {
                     output += `# Propeller Sound
 BEGIN_SOUND_ATTACHMENT
@@ -2532,7 +2572,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.jet) {
                     output += `# Jet Engine Sound
 BEGIN_SOUND_ATTACHMENT
@@ -2545,7 +2585,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.reverser) {
                     output += `# Thrust Reverser
 BEGIN_SOUND_ATTACHMENT
@@ -2557,7 +2597,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.gear) {
                     output += `# Landing Gear Extension
 BEGIN_SOUND_ATTACHMENT
@@ -2569,7 +2609,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.tires) {
                     output += `# Tire Squeal on Landing
 BEGIN_SOUND_ATTACHMENT
@@ -2581,7 +2621,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.groundRoll) {
                     output += `# Ground Roll Rumble
 BEGIN_SOUND_ATTACHMENT
@@ -2593,7 +2633,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.brakes) {
                     output += `# Brake Squeal
 BEGIN_SOUND_ATTACHMENT
@@ -2605,7 +2645,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.flaps) {
                     output += `# Flaps Extension
 BEGIN_SOUND_ATTACHMENT
@@ -2617,7 +2657,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.spoilers) {
                     output += `# Spoilers/Speedbrakes
 BEGIN_SOUND_ATTACHMENT
@@ -2629,7 +2669,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.trimWheel) {
                     output += `# Trim Wheel
 BEGIN_SOUND_ATTACHMENT
@@ -2646,7 +2686,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.stallWarning) {
                     output += `# Stall Warning
 BEGIN_SOUND_ATTACHMENT
@@ -2658,7 +2698,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.gearWarning) {
                     output += `# Gear Warning Horn
 BEGIN_SOUND_ATTACHMENT
@@ -2670,7 +2710,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.overspeed) {
                     output += `# Overspeed Warning
 BEGIN_SOUND_ATTACHMENT
@@ -2682,7 +2722,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.masterWarning) {
                     output += `# Master Warning/Caution
 BEGIN_SOUND_ATTACHMENT
@@ -2701,7 +2741,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.wind) {
                     output += `# Wind Noise
 BEGIN_SOUND_ATTACHMENT
@@ -2713,7 +2753,7 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 if (templateSounds.rain) {
                     output += `# Rain on Canopy
 BEGIN_SOUND_ATTACHMENT
@@ -2725,43 +2765,43 @@ END_SOUND_ATTACHMENT
 
 `;
                 }
-                
+
                 return output;
             }
-            
+
             generate(manipulators, eventName, useHoldCue, duplicateForRelease, templateSounds) {
                 let output = this.getHeader();
-                
+
                 output += "# Template Sound Blocks\n";
                 output += "#############################################################################################\n";
                 output += this.generateTemplateSounds(templateSounds);
                 output += "\n";
-                
+
                 output += "# Manipulator Sounds\n";
                 output += "#############################################################################################\n";
-                
+
                 const seenCommands = new Set();
-                
+
                 for (const manip of manipulators) {
                     if (seenCommands.has(manip.command)) continue;
                     seenCommands.add(manip.command);
-                    
+
                     if (manip.tooltip) {
                         output += `# ${manip.tooltip}\n`;
                     }
-                    
+
                     output += 'BEGIN_SOUND_ATTACHMENT\n';
                     output += `\tEVENT_NAME ${eventName}\n`;
                     output += `\tVEH_XYZ ${manip.xyz[0].toFixed(3)} ${manip.xyz[1].toFixed(3)} ${manip.xyz[2].toFixed(3)}\n`;
-                    
+
                     if (useHoldCue) {
                         output += `\tEVENT_CMND_HOLD_CUE ${manip.command}\n`;
                     } else {
                         output += `\tEVENT_CMND_CUE ${manip.command}\n`;
                     }
-                    
+
                     output += 'END_SOUND_ATTACHMENT\n\n';
-                    
+
                     if (duplicateForRelease) {
                         output += `# ${manip.tooltip || manip.command} - Release\n`;
                         output += 'BEGIN_SOUND_ATTACHMENT\n';
@@ -2771,7 +2811,7 @@ END_SOUND_ATTACHMENT
                         output += 'END_SOUND_ATTACHMENT\n\n';
                     }
                 }
-                
+
                 return output;
             }
         }
@@ -3046,14 +3086,14 @@ ${events.map(e => `  ${e}`).join('\n')}
 PLACEHOLDER FILES
 ===========================================
 
-${this.createPlaceholders ? 
-`Each event folder contains:
+${this.createPlaceholders ?
+                        `Each event folder contains:
   - [event_name].wav - Placeholder audio file (1 second silence)
   - _event_info.json - Event metadata
 
 Replace the .wav files with your actual sound files.
 The _event_info.json files are for reference only.` :
-`Each event folder contains:
+                        `Each event folder contains:
   - _event_info.json - Event metadata
 
 Add your .wav audio files to each folder.`}
@@ -3111,4 +3151,5 @@ documentation or community forums.
         }
     </script>
 </body>
+
 </html>
