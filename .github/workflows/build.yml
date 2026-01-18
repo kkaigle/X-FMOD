@@ -40,9 +40,9 @@ jobs:
     # --- Windows Installer ---
     - name: Compile Windows Installer
       if: runner.os == 'Windows'
-      uses: Minisign/run-inno-setup-action@v1.2.0
-      with:
-        path: installer/setup.iss
+      run: |
+        choco install innosetup
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/setup.iss
         
     # --- macOS DMG ---
     - name: Create DMG
