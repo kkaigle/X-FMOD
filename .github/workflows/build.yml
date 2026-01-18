@@ -8,54 +8,36 @@ on:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-        cache: 'pip'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install Dependencies
+        run: npm ci
 
-    - name: Install Linux dependencies
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Build Application
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist
 
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller --name "X-FMOD Toolkit" --onefile --noconsole --add-data "X-FMOD.html${{ runner.os == 'Windows' && ';' || ':' }}." app.py
-
-    # --- Windows Installer ---
-    - name: Compile Windows Installer
-      if: runner.os == 'Windows'
-      run: |
-        choco install innosetup
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/setup.iss
-        
-    - name: Create DMG
-      if: runner.os == 'macOS'
-      run: |
-        hdiutil create -volname "X-FMOD Toolkit" -srcfolder "dist/X-FMOD Toolkit.app" -ov -format UDZO "dist/X-FMOD-Toolkit.dmg"
-
-    # --- Upload Artifacts ---
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: X-FMOD-Toolkit-${{ runner.os }}
-        path: |
-          dist/X-FMOD*Toolkit*Setup.exe
-          dist/*.dmg
-          dist/X-FMOD Toolkit
-        if-no-files-found: ignore
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: X-FMOD-Toolkit-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+          if-no-files-found: warn
