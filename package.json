@@ -1,0 +1,45 @@
+{
+    "name": "x-fmod-toolkit",
+    "version": "1.0.0",
+    "description": "Professional X-Plane FMOD Toolkit by MACLine Dynamics",
+    "main": "electron-main.js",
+    "author": "MACLine Dynamics",
+    "license": "MIT",
+    "scripts": {
+        "start": "electron .",
+        "dist": "electron-builder",
+        "postinstall": "electron-builder install-app-deps"
+    },
+    "devDependencies": {
+        "electron": "^28.1.0",
+        "electron-builder": "^24.9.1"
+    },
+    "build": {
+        "appId": "com.maclineList.xfmod",
+        "productName": "X-FMOD Toolkit",
+        "files": [
+            "X-FMOD.html",
+            "electron-main.js",
+            "icon.png"
+        ],
+        "mac": {
+            "target": "dmg",
+            "category": "public.app-category.developer-tools",
+            "icon": "icon.png"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "icon.png"
+        },
+        "linux": {
+            "target": "AppImage",
+            "category": "Development"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true
+        }
+    }
+}
