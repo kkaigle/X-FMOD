@@ -983,6 +983,60 @@
             display: inline-block;
             margin-left: 0.5rem;
         }
+
+        /* Compare Modal Styles */
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .compare-table th {
+            text-align: left;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .compare-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .compare-row.deselected {
+            opacity: 0.5;
+        }
+
+        .compare-row:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .diff-old {
+            color: var(--error);
+            text-decoration: line-through;
+            font-size: 0.8em;
+            display: block;
+        }
+
+        .diff-new {
+            color: var(--success);
+            font-weight: 500;
+            display: block;
+        }
+
+        /* Modal Footer Actions */
+        .modal-footer-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
     </style>
 </head>
 
@@ -1366,6 +1420,60 @@
                     <button class="btn btn-success hidden" id="downloadBtnUpdate">
                         Download Updated .SND File
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPARE MODAL -->
+        <div id="compareModal" class="modal-overlay">
+            <div class="modal" style="max-width: 900px;">
+                <div class="modal-header">
+                    <span class="modal-title">Compare & Finalize Updates</span>
+                    <button class="modal-close" onclick="closeCompareModal()">×</button>
+                </div>
+
+                <div style="padding: 1rem; background: var(--bg-tertiary); border-radius: 6px; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 0.25rem;">Coordinate Changes Found</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                Review the proposed coordinate updates below. Uncheck any changes you wish to discard.
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent);"
+                                id="compareTotalChanges">0</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Changes Detected</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-body" style="padding: 0;">
+                    <table class="compare-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="compareSelectAll" checked
+                                        onclick="toggleAllCompare(this.checked)">
+                                </th>
+                                <th>Command / Event</th>
+                                <th>Coordinates (XYZ)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compareBody">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="modal-footer modal-footer-actions">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        <span id="compareSelectedCount">0</span> changes selected
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn secondary" onclick="closeCompareModal()">Cancel</button>
+                        <button class="btn btn-success" onclick="applyUpdates()">Finalize Update</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1797,57 +1905,31 @@
                 progressFill.style.width = '60%';
                 log('Built command-to-coordinate mapping', 'info', 'consoleUpdate');
 
-                // Update SND file
+                // Identify Changes (Don't update yet)
                 const updater = new SNDUpdater(sndFileContent);
-                const updateResult = updater.updateCoordinates(commandMap);
+                const results = updater.identifyChanges(commandMap);
 
-                progressFill.style.width = '100%';
+                progressFill.style.width = '90%';
 
-                const endTime = performance.now();
-                const processingTime = Math.round(endTime - startTime);
-
-                log('Update complete!', 'success', 'consoleUpdate');
-                log(`Updated ${updateResult.updated} coordinates`, 'success', 'consoleUpdate');
-
-                if (updateResult.unmatched.length > 0) {
-                    log(`Warning: ${updateResult.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
-                    log('Unmatched commands:', 'warning', 'consoleUpdate');
-                    updateResult.unmatched.slice(0, 5).forEach(cmd => {
-                        log(`  - ${cmd}`, 'warning', 'consoleUpdate');
-                    });
-                    if (updateResult.unmatched.length > 5) {
-                        log(`  ... and ${updateResult.unmatched.length - 5} more`, 'warning', 'consoleUpdate');
-                    }
+                if (results.changes.length === 0) {
+                    log('No coordinate changes needed. Files match.', 'success', 'consoleUpdate');
+                    document.getElementById('updateBtn').disabled = false;
+                    progressFill.style.width = '100%';
+                    return;
                 }
 
-                updatedContent = updateResult.content;
+                log(`Found ${results.changes.length} potential updates. Opening comparison...`, 'info', 'consoleUpdate');
 
-                // Update stats
-                document.getElementById('statEntriesFound').textContent = updateResult.totalEntries.toLocaleString();
-                document.getElementById('statMatched').textContent = updateResult.matched.toLocaleString();
-                document.getElementById('statUpdated').textContent = updateResult.updated.toLocaleString();
-                document.getElementById('statUnmatched').textContent = updateResult.unmatched.length.toLocaleString();
-                document.getElementById('statTimeUpdate').textContent = processingTime + 'ms';
-                document.getElementById('statsGridUpdate').classList.remove('hidden');
+                openCompareModal(results.changes, results.totalEntries, results.matched, results.unmatched);
 
-                // Show download button
-                const downloadBtn = document.getElementById('downloadBtnUpdate');
-                downloadBtn.classList.remove('hidden');
-                const outputFilename = document.getElementById('outputNameUpdate').value || 'updated.snd';
-                downloadBtn.onclick = () => downloadFile(updatedContent, outputFilename);
-
-                setTimeout(() => {
-                    progressBar.classList.add('hidden');
-                    progressFill.style.width = '0';
-                }, 500);
+                // Note: The workflow pauses here until user clicks "Finalize" in modal
 
             } catch (error) {
                 log('ERROR: ' + error.message, 'error', 'consoleUpdate');
                 progressFill.style.width = '0';
                 setTimeout(() => progressBar.classList.add('hidden'), 500);
+                document.getElementById('updateBtn').disabled = false;
             }
-
-            document.getElementById('updateBtn').disabled = false;
         }
 
         // ========================================================================
@@ -2446,17 +2528,20 @@
         class SNDUpdater {
             constructor(sndContent) {
                 this.content = sndContent;
+                this.originalLines = sndContent.split('\n');
             }
 
-            updateCoordinates(commandMap) {
-                const lines = this.content.split('\n');
-                let updatedLines = [];
+            // identifyChanges returns a list of proposed updates
+            identifyChanges(commandMap) {
+                const lines = [...this.originalLines]; // Copy
+                let changes = [];
                 let currentCommand = null;
+                let pendingXYZLineIndex = null;
+                let unmatched = [];
+
+                // Stats
                 let totalEntries = 0;
                 let matched = 0;
-                let updated = 0;
-                let unmatched = [];
-                let pendingXYZLineIndex = null;
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
@@ -2471,8 +2556,7 @@
 
                     // Mark VEH_XYZ lines for potential update
                     if (trimmed.startsWith('VEH_XYZ')) {
-                        pendingXYZLineIndex = updatedLines.length;
-                        updatedLines.push(line);
+                        pendingXYZLineIndex = i;
                         continue;
                     }
 
@@ -2482,35 +2566,55 @@
                         trimmed.startsWith('EVENT_CMND_UP') ||
                         trimmed.startsWith('EVENT_CMND_DOWN') ||
                         trimmed.startsWith('EVENT_CMND_ONCE')) {
+
                         const parts = trimmed.split(/\s+/);
                         if (parts.length >= 2) {
                             currentCommand = parts.slice(1).join(' ');
 
-                            // Update the pending VEH_XYZ line if we have a match
-                            if (currentCommand && pendingXYZLineIndex !== null && commandMap.has(currentCommand)) {
-                                const xyz = commandMap.get(currentCommand);
-                                const oldLine = updatedLines[pendingXYZLineIndex];
-                                const tabs = oldLine.match(/^\t*/)[0];
-                                updatedLines[pendingXYZLineIndex] = `${tabs}VEH_XYZ ${xyz[0].toFixed(3)} ${xyz[1].toFixed(3)} ${xyz[2].toFixed(3)}`;
-                                matched++;
-                                updated++;
-                                pendingXYZLineIndex = null;
-                            } else if (currentCommand && pendingXYZLineIndex !== null) {
-                                if (!unmatched.includes(currentCommand)) {
-                                    unmatched.push(currentCommand);
+                            // Check for match if we have a pending XYZ line
+                            if (currentCommand && pendingXYZLineIndex !== null) {
+                                if (commandMap.has(currentCommand)) {
+                                    const newXYZ = commandMap.get(currentCommand);
+
+                                    // Get old XYZ to see if it actually changed
+                                    const oldLine = lines[pendingXYZLineIndex];
+                                    const oldParts = oldLine.trim().substring(8).split(/\s+/);
+                                    const oldXYZ = [parseFloat(oldParts[0]), parseFloat(oldParts[1]), parseFloat(oldParts[2])];
+
+                                    // Simple distance check to avoid 0.000 vs -0.000 diffs or negligible changes
+                                    const isDifferent =
+                                        Math.abs(oldXYZ[0] - newXYZ[0]) > 0.001 ||
+                                        Math.abs(oldXYZ[1] - newXYZ[1]) > 0.001 ||
+                                        Math.abs(oldXYZ[2] - newXYZ[2]) > 0.001;
+
+                                    if (isDifferent) {
+                                        changes.push({
+                                            id: changes.length,
+                                            command: currentCommand,
+                                            lineIndex: pendingXYZLineIndex,
+                                            oldLine: oldLine, // Keep indentation
+                                            oldXYZ: oldXYZ,
+                                            newXYZ: newXYZ,
+                                            selected: true // Default to checked
+                                        });
+                                    }
+
+                                    matched++;
+                                    pendingXYZLineIndex = null;
+                                } else {
+                                    if (!unmatched.includes(currentCommand)) {
+                                        unmatched.push(currentCommand);
+                                    }
                                 }
                             }
                         }
                     }
-
-                    updatedLines.push(line);
                 }
 
                 return {
-                    content: updatedLines.join('\n'),
+                    changes,
                     totalEntries,
                     matched,
-                    updated,
                     unmatched
                 };
             }
@@ -2815,6 +2919,152 @@ END_SOUND_ATTACHMENT
 
                 return output;
             }
+        }
+
+        // COMPARE MODAL FUNCTIONS (NEW)
+        let currentDiffs = [];
+
+        function openCompareModal(diffs, totalEntries, matched, unmatched) {
+            currentDiffs = diffs;
+            document.getElementById('compareTotalChanges').textContent = diffs.length;
+            document.getElementById('compareSelectedCount').textContent = diffs.length;
+            document.getElementById('compareSelectAll').checked = true;
+
+            // Store stats for later
+            currentDiffs.stats = { totalEntries, matched, unmatched };
+
+            renderCompareTable();
+            document.getElementById('compareModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCompareModal() {
+            document.getElementById('compareModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.getElementById('updateBtn').disabled = false;
+        }
+
+        function renderCompareTable() {
+            const tbody = document.getElementById('compareBody');
+            tbody.innerHTML = '';
+
+            if (currentDiffs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No changes found.</td></tr>';
+                return;
+            }
+
+            // Show first 100 changes to prevent lag if there are thousands
+            const limit = 100;
+            const diffsToShow = currentDiffs.slice(0, limit);
+
+            diffsToShow.forEach(diff => {
+                const tr = document.createElement('tr');
+                tr.className = `compare-row ${diff.selected ? '' : 'deselected'}`;
+
+                tr.innerHTML = `
+                    <td>
+                        <input type="checkbox" ${diff.selected ? 'checked' : ''} 
+                               onchange="toggleDiff(${diff.id}, this.checked)">
+                    </td>
+                    <td>
+                        <div style="font-weight: 600;">${escapeHtml(diff.command)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Line ${diff.lineIndex + 1}</div>
+                    </td>
+                    <td>
+                        <span class="diff-old">
+                            ${diff.oldXYZ[0].toFixed(3)}, ${diff.oldXYZ[1].toFixed(3)}, ${diff.oldXYZ[2].toFixed(3)}
+                        </span>
+                        <span class="diff-new">
+                            ${diff.newXYZ[0].toFixed(3)}, ${diff.newXYZ[1].toFixed(3)}, ${diff.newXYZ[2].toFixed(3)}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (currentDiffs.length > limit) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="3" style="text-align: center; color: var(--text-muted);">
+                    ... and ${currentDiffs.length - limit} more changes (hidden for performance)
+                </td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        function toggleDiff(id, checked) {
+            const diff = currentDiffs.find(d => d.id === id);
+            if (diff) {
+                diff.selected = checked;
+                renderCompareTable(); // Re-render to update opacity
+                updateCompareCounts();
+            }
+        }
+
+        function toggleAllCompare(checked) {
+            currentDiffs.forEach(diff => diff.selected = checked);
+            renderCompareTable();
+            updateCompareCounts();
+        }
+
+        function updateCompareCounts() {
+            const selected = currentDiffs.filter(d => d.selected).length;
+            document.getElementById('compareSelectedCount').textContent = selected;
+        }
+
+        function applyUpdates() {
+            const selectedChanges = currentDiffs.filter(d => d.selected);
+            const stats = currentDiffs.stats;
+
+            // Apply changes to the original content
+            // Need to recreate the updater to access content easily, or just use the global
+            const updater = new SNDUpdater(sndFileContent);
+            const lines = [...updater.originalLines];
+
+            selectedChanges.forEach(diff => {
+                const tabs = diff.oldLine.match(/^\t*/)[0];
+                lines[diff.lineIndex] = `${tabs}VEH_XYZ ${diff.newXYZ[0].toFixed(3)} ${diff.newXYZ[1].toFixed(3)} ${diff.newXYZ[2].toFixed(3)}`;
+            });
+
+            const updatedContent = lines.join('\n');
+            const updatedCount = selectedChanges.length;
+
+            closeCompareModal();
+
+            // Finish the workflow (Update UI with results)
+            log('Update complete!', 'success', 'consoleUpdate');
+            log(`Updated ${updatedCount} coordinates`, 'success', 'consoleUpdate');
+
+            if (stats.unmatched.length > 0) {
+                log(`Warning: ${stats.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
+                log('Unmatched commands:', 'warning', 'consoleUpdate');
+                stats.unmatched.slice(0, 5).forEach(cmd => {
+                    log(`  - ${cmd}`, 'warning', 'consoleUpdate');
+                });
+                if (stats.unmatched.length > 5) {
+                    log(`  ... and ${stats.unmatched.length - 5} more`, 'warning', 'consoleUpdate');
+                }
+            }
+
+            // Update stats grid
+            document.getElementById('statEntriesFound').textContent = stats.totalEntries.toLocaleString();
+            document.getElementById('statMatched').textContent = stats.matched.toLocaleString();
+            document.getElementById('statUpdated').textContent = updatedCount.toLocaleString();
+            document.getElementById('statUnmatched').textContent = stats.unmatched.length.toLocaleString();
+            document.getElementById('statsGridUpdate').classList.remove('hidden');
+
+            // Show download button
+            const downloadBtn = document.getElementById('downloadBtnUpdate');
+            downloadBtn.classList.remove('hidden');
+            const outputFilename = document.getElementById('outputNameUpdate').value || 'updated.snd';
+            downloadBtn.onclick = () => downloadFile(updatedContent, outputFilename);
+
+            // Hide progress
+            const progressBar = document.getElementById('progressBarUpdate');
+            const progressFill = document.getElementById('progressFillUpdate');
+            setTimeout(() => {
+                progressBar.classList.add('hidden');
+                progressFill.style.width = '0';
+            }, 500);
         }
 
         // FMOD PACKAGE EXPORT FUNCTION
