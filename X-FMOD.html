@@ -2556,6 +2556,7 @@
                 const lines = [...this.originalLines]; // Copy
                 let changes = [];
                 let currentCommand = null;
+                let currentEventName = 'Unknown Event';
                 let pendingXYZLineIndex = null;
                 let unmatched = [];
 
@@ -2571,7 +2572,13 @@
                     if (trimmed === 'BEGIN_SOUND_ATTACHMENT') {
                         totalEntries++;
                         currentCommand = null;
+                        currentEventName = 'Unknown Event';
                         pendingXYZLineIndex = null;
+                    }
+
+                    // Track Event Name
+                    if (trimmed.startsWith('EVENT_NAME ')) {
+                        currentEventName = trimmed.substring(11).trim();
                     }
 
                     // Mark VEH_XYZ lines for potential update
@@ -2611,6 +2618,7 @@
                                         changes.push({
                                             id: changes.length,
                                             command: currentCommand,
+                                            eventName: currentEventName,
                                             lineIndex: pendingXYZLineIndex,
                                             oldLine: oldLine, // Keep indentation
                                             oldXYZ: oldXYZ,
@@ -2987,16 +2995,23 @@ END_SOUND_ATTACHMENT
                                onchange="toggleDiff(${diff.id}, this.checked)">
                     </td>
                     <td>
-                        <div style="font-weight: 600;">${escapeHtml(diff.command)}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">Line ${diff.lineIndex + 1}</div>
+                        <div style="font-weight: 600; color: var(--accent); margin-bottom: 2px;">${escapeHtml(diff.eventName)}</div>
+                        <div style="font-size: 0.8rem; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px; display: inline-block;">${escapeHtml(diff.command)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Line ${diff.lineIndex + 1}</div>
                     </td>
                     <td>
-                        <span class="diff-old">
-                            ${diff.oldXYZ[0].toFixed(3)}, ${diff.oldXYZ[1].toFixed(3)}, ${diff.oldXYZ[2].toFixed(3)}
-                        </span>
-                        <span class="diff-new">
-                            ${diff.newXYZ[0].toFixed(3)}, ${diff.newXYZ[1].toFixed(3)}, ${diff.newXYZ[2].toFixed(3)}
-                        </span>
+                        <div style="margin-bottom: 4px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: inline-block; width: 30px;">OLD:</span>
+                            <span class="diff-old" style="display: inline;">
+                                ${diff.oldXYZ[0].toFixed(3)}, ${diff.oldXYZ[1].toFixed(3)}, ${diff.oldXYZ[2].toFixed(3)}
+                            </span>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: inline-block; width: 30px;">NEW:</span>
+                            <span class="diff-new" style="display: inline;">
+                                ${diff.newXYZ[0].toFixed(3)}, ${diff.newXYZ[1].toFixed(3)}, ${diff.newXYZ[2].toFixed(3)}
+                            </span>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
