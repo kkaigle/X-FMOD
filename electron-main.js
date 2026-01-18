@@ -6,6 +6,7 @@ function createWindow() {
         width: 1400,
         height: 900,
         title: 'X-FMOD Toolkit',
+        icon: path.join(__dirname, 'icon.png'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false

@@ -19,14 +19,17 @@
         "productName": "X-FMOD Toolkit",
         "files": [
             "X-FMOD.html",
-            "electron-main.js"
+            "electron-main.js",
+            "icon.png"
         ],
         "mac": {
             "target": "dmg",
-            "category": "public.app-category.developer-tools"
+            "category": "public.app-category.developer-tools",
+            "icon": "icon.png"
         },
         "win": {
-            "target": "nsis"
+            "target": "nsis",
+            "icon": "icon.png"
         },
         "linux": {
             "target": "AppImage",
