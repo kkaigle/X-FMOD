@@ -1901,6 +1901,7 @@
         let soundEntries = [];
         let currentFilter = 'all';
         let nextEntryId = 1;
+        let currentDiffs = [];
 
         // ========================================================================
         // CLASS DEFINITIONS
@@ -3192,10 +3193,17 @@ documentation or community forums.
         let currentFilename = 'aircraft_sounds.snd';
 
         function openReviewModal(filename) {
+            console.log('openReviewModal called with:', filename);
             currentFilename = filename;
-            renderReviewModal();
-            document.getElementById('reviewModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
+            try {
+                renderReviewModal();
+                document.getElementById('reviewModal').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                console.log('Review modal opened');
+            } catch (e) {
+                console.error('Error opening review modal:', e);
+                alert('Error opening review modal: ' + e.message);
+            }
         }
 
         function closeReviewModal() {
@@ -3430,7 +3438,7 @@ documentation or community forums.
         // OBJ Parser (same as before)
 
         // COMPARE MODAL FUNCTIONS (NEW)
-        let currentDiffs = [];
+
 
         function openCompareModal(diffs, totalEntries, matched, unmatched) {
             currentDiffs = diffs;
