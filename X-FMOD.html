@@ -4167,13 +4167,49 @@ documentation or community forums.
                 if (events.length > 0) {
                     updateEventDropdown(events);
 
+                    // Extract Folders for Categories
+                    const newCategories = new Set();
+                    events.forEach(path => {
+                        // valid path: event:/root/category/name
+                        const cleanPath = path.replace('event:/', '');
+                        const parts = cleanPath.split('/');
+
+                        // We assume the structure is Root/Category/Name or just Category/Name
+                        // If standard aircraft/category/name, we want part[1]
+                        if (parts.length >= 3) {
+                            // aircraft/switches/name -> switches
+                            newCategories.add(parts[1]);
+                        } else if (parts.length === 2) {
+                            // simple/name -> simple
+                            newCategories.add(parts[0]);
+                        }
+                    });
+
+                    // Add to userCategories
+                    let addedCount = 0;
+                    newCategories.forEach(cat => {
+                        if (!userCategories.includes(cat)) {
+                            userCategories.push(cat);
+                            addedCount++;
+                        }
+                    });
+
+                    if (addedCount > 0) {
+                        try {
+                            renderCategories();
+                            log(`Added ${addedCount} FMOD folders to categories.`, 'success');
+                        } catch (e) {
+                            console.error('Error rendering categories:', e);
+                        }
+                    }
+
                     dropText.textContent = path.basename(projectPath);
                     fmodInfo.innerHTML = `
                         <div class="file-info">
                             <div class="file-name">
                                 <span>📁 FMOD Project</span>
                             </div>
-                            <div class="file-size">${events.length} events found</div>
+                            <div class="file-size">${events.length} events found, ${newCategories.size} folders added</div>
                             <button class="remove-btn" onclick="resetFMODProject(event)">×</button>
                         </div>
                     `;
@@ -4203,6 +4239,13 @@ documentation or community forums.
                 <option value="/aircraft/generic/button">Generic Button</option>
                 <option value="custom">Custom...</option>
             `;
+
+            // Reset categories to default
+            userCategories = ['switches', 'knobs', 'buttons', 'warnings'];
+            try {
+                renderCategories();
+            } catch (e) { console.error(e); }
+
             log('FMOD Project unloaded.', 'info');
         }
 
@@ -4235,7 +4278,7 @@ documentation or community forums.
 
             eventFiles.forEach(file => {
                 const content = fs.readFileSync(path.join(eventDir, file), 'utf8');
-                // Check if it is a folder proxy or actual event? 
+                // Check if it is a folder proxy or actual event?
                 // In FMOD 2.02, events are in Metadata/Event/{guid}.xml
 
                 const guidMatch = content.match(/<object class="Event" id="\{([^}]+)\}"/);
