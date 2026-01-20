@@ -728,7 +728,6 @@
 
         .compare-row.deselected td {
             opacity: 0.5;
-            text-decoration: line-through;
         }
 
         .compare-row.deselected td input {
@@ -737,7 +736,6 @@
 
         .diff-old {
             color: #bf616a;
-            text-decoration: line-through;
             margin-right: 0.5rem;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
@@ -1356,10 +1354,10 @@
             </div>
 
             <div class="mode-description" id="modeDescription">
-                Generate a complete .snd file from cockpit.obj manipulators with template sound blocks. The 
+                Generate a complete .snd file from cockpit.obj manipulators with template sound blocks. The
                 SND file requires a lot of hand crafted customization, but this tool will give you a big head
                 start by parsing your cockpit.obj and letting you customize the final output. I would recommend
-                using a less generic naming convention. More custom actions will likely come in future builds. 
+                using a less generic naming convention. More custom actions will likely come in future builds.
             </div>
         </header>
 
@@ -1904,6 +1902,797 @@
         let currentFilter = 'all';
         let nextEntryId = 1;
 
+        // ========================================================================
+        // CLASS DEFINITIONS
+        // ========================================================================
+
+        class SoundEntry {
+            constructor(data) {
+                this.id = data.id || `entry_${nextEntryId++}`;
+                this.eventName = data.eventName || '/aircraft/sound';
+                this.triggerType = data.triggerType || 'EVENT_START_COND';
+                this.startCond = data.startCond || '';
+                this.endCond = data.endCond || '';
+                this.command = data.command || '';
+                this.cueTrigger = data.cueTrigger || '';
+                this.autoEndCond = data.autoEndCond || '';
+                this.xyz = data.xyz || [0, 0, 0];
+                this.polyphonic = data.polyphonic || false;
+                this.allowedForAI = data.allowedForAI || false;
+                this.deleted = false;
+                this.vehPart = data.vehPart || null;
+                this.paramDrefIdx = data.paramDrefIdx !== undefined ? data.paramDrefIdx : null;
+                this.isTemplate = data.isTemplate || false;
+                this.comment = data.comment || '';
+            }
+
+            toSND() {
+                if (this.deleted) return '';
+
+                let output = '';
+
+                if (this.comment) {
+                    output += `# ${this.comment}\n`;
+                }
+
+                output += 'BEGIN_SOUND_ATTACHMENT\n';
+                output += `\tEVENT_NAME ${this.eventName}\n`;
+
+                if (this.vehPart) {
+                    output += `\tVEH_PART ${this.vehPart}\n`;
+                } else {
+                    output += `\tVEH_XYZ ${this.xyz[0].toFixed(3)} ${this.xyz[1].toFixed(3)} ${this.xyz[2].toFixed(3)}\n`;
+                }
+
+                if (this.polyphonic) {
+                    output += `\tEVENT_POLYPHONIC\n`;
+                }
+
+                if (this.allowedForAI) {
+                    output += `\tEVENT_ALLOWED_FOR_AI\n`;
+                }
+
+                if (this.paramDrefIdx !== null) {
+                    output += `\tPARAM_DREF_IDX ${this.paramDrefIdx}\n`;
+                }
+
+                switch (this.triggerType) {
+                    case 'EVENT_START_COND':
+                        if (this.startCond) output += `\tEVENT_START_COND ${this.startCond}\n`;
+                        if (this.endCond) output += `\tEVENT_END_COND ${this.endCond}\n`;
+                        break;
+                    case 'EVENT_CMND_DOWN':
+                        if (this.command) output += `\tEVENT_CMND_DOWN ${this.command}\n`;
+                        break;
+                    case 'EVENT_CMND_UP':
+                        if (this.command) output += `\tEVENT_CMND_UP ${this.command}\n`;
+                        break;
+                    case 'EVENT_CMND_HOLD_STOP':
+                        if (this.command) output += `\tEVENT_CMND_HOLD_STOP ${this.command}\n`;
+                        break;
+                    case 'EVENT_CMND_HOLD_CUE':
+                        if (this.command) output += `\tEVENT_CMND_HOLD_CUE ${this.command}\n`;
+                        break;
+                    case 'CUE_TRIGGER_COND':
+                        if (this.cueTrigger) output += `\tCUE_TRIGGER_COND ${this.cueTrigger}\n`;
+                        break;
+                }
+
+                if (this.autoEndCond) {
+                    output += `\tEVENT_AUTO_END_FROM_START_COND ${this.autoEndCond}\n`;
+                }
+
+                output += 'END_SOUND_ATTACHMENT\n\n';
+                return output;
+            }
+        }
+
+        class OBJParser {
+            constructor(content) {
+                this.content = content;
+                this.vertices = [];
+                this.manipulators = [];
+            }
+
+            parse() {
+                const lines = this.content.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('VT\t') || line.startsWith('VT ')) {
+                        this.parseVertex(line);
+                    }
+                }
+
+                let currentVertexOffset = 0;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    if (line.startsWith('TRIS')) {
+                        const parts = line.split(/\s+/);
+                        if (parts.length >= 2) {
+                            currentVertexOffset = parseInt(parts[1]) || 0;
+                        }
+                    }
+
+                    if (line.includes('ATTR_manip') && !line.includes('ATTR_manip_none')) {
+                        const manip = this.parseManipulator(line, i + 1);
+                        if (manip && currentVertexOffset < this.vertices.length) {
+                            manip.xyz = this.vertices[currentVertexOffset];
+                            this.manipulators.push(manip);
+                        }
+                    }
+                }
+
+                return {
+                    vertices: this.vertices,
+                    manipulators: this.manipulators
+                };
+            }
+
+            parseVertex(line) {
+                const parts = line.split(/\s+/);
+                if (parts.length >= 4) {
+                    const x = parseFloat(parts[1]);
+                    const y = parseFloat(parts[2]);
+                    const z = parseFloat(parts[3]);
+                    if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+                        this.vertices.push([x, y, z]);
+                    }
+                }
+            }
+
+            parseManipulator(line, lineNum) {
+                const parts = line.split('\t').filter(p => p.trim());
+
+                if (parts.length < 3) return null;
+
+                const manipType = parts[0].replace('ATTR_manip_', '');
+                const cursor = parts[1] || 'hand';
+                const command = parts[2] || '';
+                const tooltip = parts[3] || '';
+
+                return {
+                    manipType,
+                    cursor,
+                    command,
+                    tooltip,
+                    xyz: [0, 0, 0],
+                    lineNumber: lineNum
+                };
+            }
+        }
+
+        class SNDUpdater {
+            constructor(sndContent) {
+                this.content = sndContent;
+                this.originalLines = sndContent.split('\n');
+            }
+
+            // identifyChanges returns a list of proposed updates
+            identifyChanges(commandMap) {
+                const lines = [...this.originalLines]; // Copy
+                let changes = [];
+                let currentCommand = null;
+                let currentEventName = 'Unknown Event';
+                let pendingXYZLineIndex = null;
+                let unmatched = [];
+
+                // Stats
+                let totalEntries = 0;
+                let matched = 0;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const trimmed = line.trim();
+
+                    // Track when we enter a sound attachment block
+                    if (trimmed === 'BEGIN_SOUND_ATTACHMENT') {
+                        totalEntries++;
+                        currentCommand = null;
+                        currentEventName = 'Unknown Event';
+                        pendingXYZLineIndex = null;
+                    }
+
+                    // Track Event Name
+                    if (trimmed.startsWith('EVENT_NAME ')) {
+                        currentEventName = trimmed.substring(11).trim();
+                    }
+
+                    // Mark VEH_XYZ lines for potential update
+                    if (trimmed.startsWith('VEH_XYZ')) {
+                        pendingXYZLineIndex = i;
+                        continue;
+                    }
+
+                    // Extract command from EVENT_CMND_* lines
+                    if (trimmed.startsWith('EVENT_CMND_HOLD_CUE') ||
+                        trimmed.startsWith('EVENT_CMND_CUE') ||
+                        trimmed.startsWith('EVENT_CMND_UP') ||
+                        trimmed.startsWith('EVENT_CMND_DOWN') ||
+                        trimmed.startsWith('EVENT_CMND_ONCE')) {
+
+                        const parts = trimmed.split(/\s+/);
+                        if (parts.length >= 2) {
+                            currentCommand = parts.slice(1).join(' ');
+
+                            // Check for match if we have a pending XYZ line
+                            if (currentCommand && pendingXYZLineIndex !== null) {
+                                if (commandMap.has(currentCommand)) {
+                                    const newXYZ = commandMap.get(currentCommand);
+
+                                    // Get old XYZ to see if it actually changed
+                                    const oldLine = lines[pendingXYZLineIndex];
+                                    const oldParts = oldLine.trim().substring(8).split(/\s+/);
+                                    const oldXYZ = [parseFloat(oldParts[0]), parseFloat(oldParts[1]), parseFloat(oldParts[2])];
+
+                                    // Simple distance check to avoid 0.000 vs -0.000 diffs or negligible changes
+                                    const isDifferent =
+                                        Math.abs(oldXYZ[0] - newXYZ[0]) > 0.001 ||
+                                        Math.abs(oldXYZ[1] - newXYZ[1]) > 0.001 ||
+                                        Math.abs(oldXYZ[2] - newXYZ[2]) > 0.001;
+
+                                    if (isDifferent) {
+                                        changes.push({
+                                            id: changes.length,
+                                            command: currentCommand,
+                                            eventName: currentEventName,
+                                            lineIndex: pendingXYZLineIndex,
+                                            oldLine: oldLine, // Keep indentation
+                                            oldXYZ: oldXYZ,
+                                            newXYZ: newXYZ,
+                                            selected: true // Default to checked
+                                        });
+                                    }
+
+                                    matched++;
+                                    pendingXYZLineIndex = null;
+                                } else {
+                                    if (!unmatched.includes(currentCommand)) {
+                                        unmatched.push(currentCommand);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return {
+                    changes,
+                    totalEntries,
+                    matched,
+                    unmatched
+                };
+            }
+        }
+
+        class SNDGenerator {
+            constructor(templateContent) {
+                this.template = templateContent;
+            }
+
+            getDefaultHeader() {
+                return `A
+1000
+ACF_SOUNDS
+
+#################################################
+# Generated Sound Bank                          #
+# Auto-generated by XPlane SND Generator        #
+# ${new Date().toISOString()}                   #
+#################################################
+
+DISABLE_LEGACY_ALERT_SOUNDS
+
+`;
+            }
+
+            getHeader() {
+                if (!this.template) return this.getDefaultHeader();
+                const idx = this.template.indexOf('BEGIN_SOUND_ATTACHMENT');
+                if (idx > 0) return this.template.substring(0, idx);
+                return this.getDefaultHeader();
+            }
+
+            generateTemplateSounds(templateSounds) {
+                let output = '';
+
+                if (templateSounds.engine) {
+                    output += `# Engine Sound
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/engine/running
+\tVEH_PART engine 0
+\tPARAM_DREF_IDX 0
+\tEVENT_START_COND sim/flightmodel2/engines/engine_rotation_speed_rad_sec[0] > 1
+\tEVENT_END_COND sim/flightmodel2/engines/engine_rotation_speed_rad_sec[0] < 1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.propeller) {
+                    output += `# Propeller Sound
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/propeller/running
+\tVEH_PART prop 0
+\tPARAM_DREF_IDX 0
+\tEVENT_START_COND sim/flightmodel2/engines/prop_rotation_speed_rad_sec[0] > 1
+\tEVENT_END_COND sim/flightmodel2/engines/prop_rotation_speed_rad_sec[0] < 1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.jet) {
+                    output += `# Jet Engine Sound
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/jet/engine
+\tVEH_PART engine 0
+\tPARAM_DREF_IDX 0
+\tEVENT_START_COND sim/flightmodel2/engines/N1_percent[0] > 5
+\tEVENT_END_COND sim/flightmodel2/engines/N1_percent[0] < 5
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.reverser) {
+                    output += `# Thrust Reverser
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/reversers/deploy
+\tVEH_PART engine 0
+\tEVENT_START_COND sim/flightmodel2/engines/thrust_reverser_deploy_ratio[0] > 0.1
+\tEVENT_END_COND sim/flightmodel2/engines/thrust_reverser_deploy_ratio[0] < 0.1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.gear) {
+                    output += `# Landing Gear Extension
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/gear/extension
+\tVEH_XYZ 0.000 0.000 0.000
+\tEVENT_START_COND sim/flightmodel2/gear/deploy_ratio[0] > 0
+\tEVENT_END_COND sim/flightmodel2/gear/deploy_ratio[0] == 0 OR sim/flightmodel2/gear/deploy_ratio[0] == 1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.tires) {
+                    output += `# Tire Squeal on Landing
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/tires/squeal
+\tVEH_XYZ 0.000 -1.000 0.000
+\tEVENT_START_COND sim/flightmodel2/gear/tire_vertical_deflection_mtr[0] > 0.01
+\tEVENT_END_COND sim/flightmodel2/gear/on_ground[0] == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.groundRoll) {
+                    output += `# Ground Roll Rumble
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/ground/rumble
+\tVEH_XYZ 0.000 0.000 0.000
+\tEVENT_START_COND sim/flightmodel2/gear/on_ground[0] == 1 AND sim/flightmodel/position/groundspeed > 5
+\tEVENT_END_COND sim/flightmodel2/gear/on_ground[0] == 0 OR sim/flightmodel/position/groundspeed < 5
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.brakes) {
+                    output += `# Brake Squeal
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/brakes/squeal
+\tVEH_XYZ 0.000 -0.500 0.000
+\tEVENT_START_COND sim/cockpit2/controls/parking_brake_ratio > 0.5 AND sim/flightmodel/position/groundspeed > 1
+\tEVENT_END_COND sim/cockpit2/controls/parking_brake_ratio < 0.5 OR sim/flightmodel/position/groundspeed < 1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.flaps) {
+                    output += `# Flaps Extension
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/flaps/extension
+\tVEH_XYZ 0.000 0.000 2.000
+\tEVENT_START_COND sim/flightmodel2/controls/flap_handle_deploy_ratio > 0
+\tEVENT_END_COND sim/flightmodel2/wing/flap1_deg[0] == sim/aircraft/overflow/acf_flap_detents[0] OR sim/flightmodel2/wing/flap1_deg[0] == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.spoilers) {
+                    output += `# Spoilers/Speedbrakes
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/spoilers/deploy
+\tVEH_XYZ 0.000 0.000 1.000
+\tEVENT_START_COND sim/flightmodel2/controls/speedbrake_ratio > 0.1
+\tEVENT_END_COND sim/flightmodel2/controls/speedbrake_ratio < 0.1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.trimWheel) {
+                    output += `# Trim Wheel
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/trim/wheel
+\tVEH_XYZ 0.000 0.500 0.000
+\tEVENT_CMND_CUE sim/flight_controls/pitch_trim_down
+END_SOUND_ATTACHMENT
+
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/trim/wheel
+\tVEH_XYZ 0.000 0.500 0.000
+\tEVENT_CMND_CUE sim/flight_controls/pitch_trim_up
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.stallWarning) {
+                    output += `# Stall Warning
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/warning/stall
+\tVEH_XYZ 0.000 0.500 -0.500
+\tEVENT_START_COND sim/flightmodel/failures/stallwarning_on == 1
+\tEVENT_END_COND sim/flightmodel/failures/stallwarning_on == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.gearWarning) {
+                    output += `# Gear Warning Horn
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/warning/gear_horn
+\tVEH_XYZ 0.000 0.500 -0.500
+\tEVENT_START_COND sim/cockpit2/annunciators/gear_warning == 1
+\tEVENT_END_COND sim/cockpit2/annunciators/gear_warning == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.overspeed) {
+                    output += `# Overspeed Warning
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/warning/overspeed
+\tVEH_XYZ 0.000 0.500 -0.500
+\tEVENT_START_COND sim/flightmodel/failures/over_vne == 1
+\tEVENT_END_COND sim/flightmodel/failures/over_vne == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.masterWarning) {
+                    output += `# Master Warning/Caution
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/warning/master_warning
+\tVEH_XYZ 0.000 0.500 -0.500
+\tEVENT_START_COND sim/cockpit2/annunciators/master_warning == 1
+\tEVENT_END_COND sim/cockpit2/annunciators/master_warning == 0
+END_SOUND_ATTACHMENT
+
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/warning/master_caution
+\tVEH_XYZ 0.000 0.500 -0.500
+\tEVENT_START_COND sim/cockpit2/annunciators/master_caution == 1
+\tEVENT_END_COND sim/cockpit2/annunciators/master_caution == 0
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.wind) {
+                    output += `# Wind Noise
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/environment/wind
+\tVEH_XYZ 0.000 0.500 0.000
+\tEVENT_START_COND sim/flightmodel/position/indicated_airspeed > 30
+\tEVENT_END_COND sim/flightmodel/position/indicated_airspeed < 30
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                if (templateSounds.rain) {
+                    output += `# Rain on Canopy
+BEGIN_SOUND_ATTACHMENT
+\tEVENT_NAME /aircraft/environment/rain
+\tVEH_XYZ 0.000 1.000 0.000
+\tEVENT_START_COND sim/weather/rain_percent > 0.1
+\tEVENT_END_COND sim/weather/rain_percent < 0.1
+END_SOUND_ATTACHMENT
+
+`;
+                }
+
+                return output;
+            }
+
+            generate(manipulators, eventName, useHoldCue, duplicateForRelease, templateSounds) {
+                let output = this.getHeader();
+
+                output += "# Template Sound Blocks\n";
+                output += "#############################################################################################\n";
+                output += this.generateTemplateSounds(templateSounds);
+                output += "\n";
+
+                output += "# Manipulator Sounds\n";
+                output += "#############################################################################################\n";
+
+                const seenCommands = new Set();
+
+                for (const manip of manipulators) {
+                    if (seenCommands.has(manip.command)) continue;
+                    seenCommands.add(manip.command);
+
+                    if (manip.tooltip) {
+                        output += `# ${manip.tooltip}\n`;
+                    }
+
+                    output += 'BEGIN_SOUND_ATTACHMENT\n';
+                    output += `\tEVENT_NAME ${eventName}\n`;
+                    output += `\tVEH_XYZ ${manip.xyz[0].toFixed(3)} ${manip.xyz[1].toFixed(3)} ${manip.xyz[2].toFixed(3)}\n`;
+
+                    if (useHoldCue) {
+                        output += `\tEVENT_CMND_HOLD_CUE ${manip.command}\n`;
+                    } else {
+                        output += `\tEVENT_CMND_CUE ${manip.command}\n`;
+                    }
+
+                    output += 'END_SOUND_ATTACHMENT\n\n';
+
+                    if (duplicateForRelease) {
+                        output += `# ${manip.tooltip || manip.command} - Release\n`;
+                        output += 'BEGIN_SOUND_ATTACHMENT\n';
+                        output += `\tEVENT_NAME ${eventName}\n`;
+                        output += `\tVEH_XYZ ${manip.xyz[0].toFixed(3)} ${manip.xyz[1].toFixed(3)} ${manip.xyz[2].toFixed(3)}\n`;
+                        output += `\tEVENT_CMND_UP ${manip.command}\n`;
+                        output += 'END_SOUND_ATTACHMENT\n\n';
+                    }
+                }
+
+                return output;
+            }
+        }
+
+        class SNDEventParser {
+            constructor(sndContent) {
+                this.content = sndContent;
+            }
+
+            extractEvents() {
+                const lines = this.content.split('\n');
+                const events = new Set();
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (trimmed.startsWith('EVENT_NAME')) {
+                        const parts = trimmed.split(/\s+/);
+                        if (parts.length >= 2) {
+                            const eventPath = parts.slice(1).join(' ');
+                            if (eventPath.startsWith('/')) {
+                                events.add(eventPath);
+                            }
+                        }
+                    }
+                }
+
+                return Array.from(events).sort();
+            }
+        }
+
+        class FMODPackageBuilder {
+            constructor(packageName, createPlaceholders, includeReadme) {
+                this.packageName = packageName;
+                this.createPlaceholders = createPlaceholders;
+                this.includeReadme = includeReadme;
+                this.stats = {
+                    folders: 0,
+                    files: 0
+                };
+            }
+
+            async build(events) {
+                const zip = new JSZip();
+
+                // Create folder structure for each event
+                for (const eventPath of events) {
+                    // Convert /aircraft/generic/switch to aircraft/generic/switch/
+                    const cleanPath = eventPath.substring(1); // Remove leading /
+                    const parts = cleanPath.split('/');
+                    const eventName = parts[parts.length - 1] || 'event';
+                    const folderPath = cleanPath;
+
+                    // Create folder
+                    const folder = zip.folder(folderPath);
+                    this.stats.folders++;
+
+                    // Create placeholder audio file if requested
+                    if (this.createPlaceholders) {
+                        // Create minimal WAV file header (empty 1 second mono 44.1kHz)
+                        const wavData = this.createEmptyWav();
+                        folder.file(`${eventName}.wav`, wavData);
+                        this.stats.files++;
+                    }
+
+                    // Create event metadata file
+                    const metadata = {
+                        eventPath: eventPath,
+                        eventName: eventName,
+                        generatedBy: 'X-Plane SND Generator',
+                        timestamp: new Date().toISOString(),
+                        note: 'Replace placeholder audio with your actual sound file'
+                    };
+                    folder.file('_event_info.json', JSON.stringify(metadata, null, 2));
+                    this.stats.files++;
+                }
+
+                // Create README if requested
+                if (this.includeReadme) {
+                    const readme = this.generateReadme(events);
+                    zip.file('README.txt', readme);
+                    this.stats.files++;
+                }
+
+                // Create structure map
+                const structureMap = this.generateStructureMap(events);
+                zip.file('_STRUCTURE_MAP.txt', structureMap);
+                this.stats.files++;
+
+                // Generate ZIP blob
+                return await zip.generateAsync({
+                    type: 'blob',
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 6 }
+                });
+            }
+
+            createEmptyWav() {
+                // Create a minimal valid WAV file (1 second of silence, mono, 44.1kHz, 16-bit)
+                const sampleRate = 44100;
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const duration = 1; // 1 second
+                const numSamples = sampleRate * duration;
+                const dataSize = numSamples * numChannels * (bitsPerSample / 8);
+                const fileSize = 44 + dataSize;
+
+                const buffer = new ArrayBuffer(fileSize);
+                const view = new DataView(buffer);
+
+                // RIFF header
+                this.writeString(view, 0, 'RIFF');
+                view.setUint32(4, fileSize - 8, true);
+                this.writeString(view, 8, 'WAVE');
+
+                // fmt chunk
+                this.writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true); // fmt chunk size
+                view.setUint16(20, 1, true); // audio format (PCM)
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // byte rate
+                view.setUint16(32, numChannels * (bitsPerSample / 8), true); // block align
+                view.setUint16(34, bitsPerSample, true);
+
+                // data chunk
+                this.writeString(view, 36, 'data');
+                view.setUint32(40, dataSize, true);
+
+                // Audio data (silence = all zeros, already initialized)
+
+                return buffer;
+            }
+
+            writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            generateReadme(events) {
+                return `X-PLANE FMOD STUDIO PACKAGE
+Generated: ${new Date().toLocaleString()}
+Package: ${this.packageName}
+
+===========================================
+INSTALLATION INSTRUCTIONS
+===========================================
+
+1. Extract this ZIP file
+2. Open your FMOD Studio project
+3. Navigate to the Events folder in the Events tab
+4. Drag and drop the extracted folders into your Events folder
+5. Replace placeholder .wav files with your actual audio files
+6. Build your FMOD banks
+
+===========================================
+FOLDER STRUCTURE
+===========================================
+
+This package contains ${events.length} event paths organized into folders:
+
+${events.map(e => `  ${e}`).join('\n')}
+
+===========================================
+PLACEHOLDER FILES
+===========================================
+
+${this.createPlaceholders ?
+                        `Each event folder contains:
+  - [event_name].wav - Placeholder audio file (1 second silence)
+  - _event_info.json - Event metadata
+
+Replace the .wav files with your actual sound files.
+The _event_info.json files are for reference only.` :
+                        `Each event folder contains:
+  - _event_info.json - Event metadata
+
+Add your .wav audio files to each folder.`}
+
+===========================================
+NOTES
+===========================================
+
+- Event paths match your .snd file exactly
+- File names should match the last segment of the event path
+- You can rename audio files within FMOD Studio
+- Keep the folder structure intact for proper event mapping
+
+===========================================
+EXPERIMENTAL FEATURE
+===========================================
+
+This package generator is experimental. Please verify
+the folder structure matches your FMOD Studio project
+requirements before importing.
+
+For questions or issues, refer to the X-Plane FMOD
+documentation or community forums.
+`;
+            }
+
+            generateStructureMap(events) {
+                let output = `FMOD STUDIO EVENT STRUCTURE MAP\n`;
+                output += `Generated: ${new Date().toLocaleString()}\n`;
+                output += `Package: ${this.packageName}\n`;
+                output += `Total Events: ${events.length}\n`;
+                output += `\n${'='.repeat(60)}\n\n`;
+
+                // Group events by top-level folder
+                const grouped = {};
+                for (const event of events) {
+                    const parts = event.split('/').filter(p => p);
+                    const topLevel = parts[0] || 'root';
+                    if (!grouped[topLevel]) grouped[topLevel] = [];
+                    grouped[topLevel].push(event);
+                }
+
+                for (const [category, paths] of Object.entries(grouped)) {
+                    output += `${category}/\n`;
+                    for (const path of paths) {
+                        const indent = '  '.repeat(path.split('/').length - 2);
+                        const name = path.split('/').pop();
+                        output += `${indent}├─ ${name}\n`;
+                    }
+                    output += '\n';
+                }
+
+                return output;
+            }
+        }
+
         // Mode switching
         function switchMode(mode) {
             currentMode = mode;
@@ -2207,86 +2996,6 @@
         // REVIEW & CUSTOMIZE SYSTEM
         // ========================================================================
 
-        class SoundEntry {
-            constructor(data) {
-                this.id = data.id || `entry_${nextEntryId++}`;
-                this.eventName = data.eventName || '/aircraft/sound';
-                this.triggerType = data.triggerType || 'EVENT_START_COND';
-                this.startCond = data.startCond || '';
-                this.endCond = data.endCond || '';
-                this.command = data.command || '';
-                this.cueTrigger = data.cueTrigger || '';
-                this.autoEndCond = data.autoEndCond || '';
-                this.xyz = data.xyz || [0, 0, 0];
-                this.polyphonic = data.polyphonic || false;
-                this.allowedForAI = data.allowedForAI || false;
-                this.deleted = false;
-                this.vehPart = data.vehPart || null;
-                this.paramDrefIdx = data.paramDrefIdx !== undefined ? data.paramDrefIdx : null;
-                this.isTemplate = data.isTemplate || false;
-                this.comment = data.comment || '';
-            }
-
-            toSND() {
-                if (this.deleted) return '';
-
-                let output = '';
-
-                if (this.comment) {
-                    output += `# ${this.comment}\n`;
-                }
-
-                output += 'BEGIN_SOUND_ATTACHMENT\n';
-                output += `\tEVENT_NAME ${this.eventName}\n`;
-
-                if (this.vehPart) {
-                    output += `\tVEH_PART ${this.vehPart}\n`;
-                } else {
-                    output += `\tVEH_XYZ ${this.xyz[0].toFixed(3)} ${this.xyz[1].toFixed(3)} ${this.xyz[2].toFixed(3)}\n`;
-                }
-
-                if (this.polyphonic) {
-                    output += `\tEVENT_POLYPHONIC\n`;
-                }
-
-                if (this.allowedForAI) {
-                    output += `\tEVENT_ALLOWED_FOR_AI\n`;
-                }
-
-                if (this.paramDrefIdx !== null) {
-                    output += `\tPARAM_DREF_IDX ${this.paramDrefIdx}\n`;
-                }
-
-                switch (this.triggerType) {
-                    case 'EVENT_START_COND':
-                        if (this.startCond) output += `\tEVENT_START_COND ${this.startCond}\n`;
-                        if (this.endCond) output += `\tEVENT_END_COND ${this.endCond}\n`;
-                        break;
-                    case 'EVENT_CMND_DOWN':
-                        if (this.command) output += `\tEVENT_CMND_DOWN ${this.command}\n`;
-                        break;
-                    case 'EVENT_CMND_UP':
-                        if (this.command) output += `\tEVENT_CMND_UP ${this.command}\n`;
-                        break;
-                    case 'EVENT_CMND_HOLD_STOP':
-                        if (this.command) output += `\tEVENT_CMND_HOLD_STOP ${this.command}\n`;
-                        break;
-                    case 'EVENT_CMND_HOLD_CUE':
-                        if (this.command) output += `\tEVENT_CMND_HOLD_CUE ${this.command}\n`;
-                        break;
-                    case 'CUE_TRIGGER_COND':
-                        if (this.cueTrigger) output += `\tCUE_TRIGGER_COND ${this.cueTrigger}\n`;
-                        break;
-                }
-
-                if (this.autoEndCond) {
-                    output += `\tEVENT_AUTO_END_FROM_START_COND ${this.autoEndCond}\n`;
-                }
-
-                output += 'END_SOUND_ATTACHMENT\n\n';
-                return output;
-            }
-        }
 
         function parseSNDToEntries(sndContent) {
             const entries = [];
@@ -2719,486 +3428,6 @@
         }
 
         // OBJ Parser (same as before)
-        class OBJParser {
-            constructor(content) {
-                this.content = content;
-                this.vertices = [];
-                this.manipulators = [];
-            }
-
-            parse() {
-                const lines = this.content.split('\n');
-
-                for (const line of lines) {
-                    if (line.startsWith('VT\t') || line.startsWith('VT ')) {
-                        this.parseVertex(line);
-                    }
-                }
-
-                let currentVertexOffset = 0;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-
-                    if (line.startsWith('TRIS')) {
-                        const parts = line.split(/\s+/);
-                        if (parts.length >= 2) {
-                            currentVertexOffset = parseInt(parts[1]) || 0;
-                        }
-                    }
-
-                    if (line.includes('ATTR_manip') && !line.includes('ATTR_manip_none')) {
-                        const manip = this.parseManipulator(line, i + 1);
-                        if (manip && currentVertexOffset < this.vertices.length) {
-                            manip.xyz = this.vertices[currentVertexOffset];
-                            this.manipulators.push(manip);
-                        }
-                    }
-                }
-
-                return {
-                    vertices: this.vertices,
-                    manipulators: this.manipulators
-                };
-            }
-
-            parseVertex(line) {
-                const parts = line.split(/\s+/);
-                if (parts.length >= 4) {
-                    const x = parseFloat(parts[1]);
-                    const y = parseFloat(parts[2]);
-                    const z = parseFloat(parts[3]);
-                    if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-                        this.vertices.push([x, y, z]);
-                    }
-                }
-            }
-
-            parseManipulator(line, lineNum) {
-                const parts = line.split('\t').filter(p => p.trim());
-
-                if (parts.length < 3) return null;
-
-                const manipType = parts[0].replace('ATTR_manip_', '');
-                const cursor = parts[1] || 'hand';
-                const command = parts[2] || '';
-                const tooltip = parts[3] || '';
-
-                return {
-                    manipType,
-                    cursor,
-                    command,
-                    tooltip,
-                    xyz: [0, 0, 0],
-                    lineNumber: lineNum
-                };
-            }
-        }
-
-        // NEW: SND Updater Class
-        class SNDUpdater {
-            constructor(sndContent) {
-                this.content = sndContent;
-                this.originalLines = sndContent.split('\n');
-            }
-
-            // identifyChanges returns a list of proposed updates
-            identifyChanges(commandMap) {
-                const lines = [...this.originalLines]; // Copy
-                let changes = [];
-                let currentCommand = null;
-                let currentEventName = 'Unknown Event';
-                let pendingXYZLineIndex = null;
-                let unmatched = [];
-
-                // Stats
-                let totalEntries = 0;
-                let matched = 0;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const trimmed = line.trim();
-
-                    // Track when we enter a sound attachment block
-                    if (trimmed === 'BEGIN_SOUND_ATTACHMENT') {
-                        totalEntries++;
-                        currentCommand = null;
-                        currentEventName = 'Unknown Event';
-                        pendingXYZLineIndex = null;
-                    }
-
-                    // Track Event Name
-                    if (trimmed.startsWith('EVENT_NAME ')) {
-                        currentEventName = trimmed.substring(11).trim();
-                    }
-
-                    // Mark VEH_XYZ lines for potential update
-                    if (trimmed.startsWith('VEH_XYZ')) {
-                        pendingXYZLineIndex = i;
-                        continue;
-                    }
-
-                    // Extract command from EVENT_CMND_* lines
-                    if (trimmed.startsWith('EVENT_CMND_HOLD_CUE') ||
-                        trimmed.startsWith('EVENT_CMND_CUE') ||
-                        trimmed.startsWith('EVENT_CMND_UP') ||
-                        trimmed.startsWith('EVENT_CMND_DOWN') ||
-                        trimmed.startsWith('EVENT_CMND_ONCE')) {
-
-                        const parts = trimmed.split(/\s+/);
-                        if (parts.length >= 2) {
-                            currentCommand = parts.slice(1).join(' ');
-
-                            // Check for match if we have a pending XYZ line
-                            if (currentCommand && pendingXYZLineIndex !== null) {
-                                if (commandMap.has(currentCommand)) {
-                                    const newXYZ = commandMap.get(currentCommand);
-
-                                    // Get old XYZ to see if it actually changed
-                                    const oldLine = lines[pendingXYZLineIndex];
-                                    const oldParts = oldLine.trim().substring(8).split(/\s+/);
-                                    const oldXYZ = [parseFloat(oldParts[0]), parseFloat(oldParts[1]), parseFloat(oldParts[2])];
-
-                                    // Simple distance check to avoid 0.000 vs -0.000 diffs or negligible changes
-                                    const isDifferent =
-                                        Math.abs(oldXYZ[0] - newXYZ[0]) > 0.001 ||
-                                        Math.abs(oldXYZ[1] - newXYZ[1]) > 0.001 ||
-                                        Math.abs(oldXYZ[2] - newXYZ[2]) > 0.001;
-
-                                    if (isDifferent) {
-                                        changes.push({
-                                            id: changes.length,
-                                            command: currentCommand,
-                                            eventName: currentEventName,
-                                            lineIndex: pendingXYZLineIndex,
-                                            oldLine: oldLine, // Keep indentation
-                                            oldXYZ: oldXYZ,
-                                            newXYZ: newXYZ,
-                                            selected: true // Default to checked
-                                        });
-                                    }
-
-                                    matched++;
-                                    pendingXYZLineIndex = null;
-                                } else {
-                                    if (!unmatched.includes(currentCommand)) {
-                                        unmatched.push(currentCommand);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return {
-                    changes,
-                    totalEntries,
-                    matched,
-                    unmatched
-                };
-            }
-        }
-
-        // SND Generator (same as before - keeping the full implementation)
-        class SNDGenerator {
-            constructor(templateContent) {
-                this.template = templateContent;
-            }
-
-            getDefaultHeader() {
-                return `A
-1000
-ACF_SOUNDS
-
-#################################################
-# Generated Sound Bank                          #
-# Auto-generated by XPlane SND Generator        #
-# ${new Date().toISOString()}                   #
-#################################################
-
-DISABLE_LEGACY_ALERT_SOUNDS
-
-`;
-            }
-
-            getHeader() {
-                if (!this.template) return this.getDefaultHeader();
-                const idx = this.template.indexOf('BEGIN_SOUND_ATTACHMENT');
-                if (idx > 0) return this.template.substring(0, idx);
-                return this.getDefaultHeader();
-            }
-
-            generateTemplateSounds(templateSounds) {
-                let output = '';
-
-                if (templateSounds.engine) {
-                    output += `# Engine Sound
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/engine/running
-\tVEH_PART engine 0
-\tPARAM_DREF_IDX 0
-\tEVENT_START_COND sim/flightmodel2/engines/engine_rotation_speed_rad_sec[0] > 1
-\tEVENT_END_COND sim/flightmodel2/engines/engine_rotation_speed_rad_sec[0] < 1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.propeller) {
-                    output += `# Propeller Sound
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/propeller/running
-\tVEH_PART prop 0
-\tPARAM_DREF_IDX 0
-\tEVENT_START_COND sim/flightmodel2/engines/prop_rotation_speed_rad_sec[0] > 1
-\tEVENT_END_COND sim/flightmodel2/engines/prop_rotation_speed_rad_sec[0] < 1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.jet) {
-                    output += `# Jet Engine Sound
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/jet/engine
-\tVEH_PART engine 0
-\tPARAM_DREF_IDX 0
-\tEVENT_START_COND sim/flightmodel2/engines/N1_percent[0] > 5
-\tEVENT_END_COND sim/flightmodel2/engines/N1_percent[0] < 5
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.reverser) {
-                    output += `# Thrust Reverser
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/reversers/deploy
-\tVEH_PART engine 0
-\tEVENT_START_COND sim/flightmodel2/engines/thrust_reverser_deploy_ratio[0] > 0.1
-\tEVENT_END_COND sim/flightmodel2/engines/thrust_reverser_deploy_ratio[0] < 0.1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.gear) {
-                    output += `# Landing Gear Extension
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/gear/extension
-\tVEH_XYZ 0.000 0.000 0.000
-\tEVENT_START_COND sim/flightmodel2/gear/deploy_ratio[0] > 0
-\tEVENT_END_COND sim/flightmodel2/gear/deploy_ratio[0] == 0 OR sim/flightmodel2/gear/deploy_ratio[0] == 1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.tires) {
-                    output += `# Tire Squeal on Landing
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/tires/squeal
-\tVEH_XYZ 0.000 -1.000 0.000
-\tEVENT_START_COND sim/flightmodel2/gear/tire_vertical_deflection_mtr[0] > 0.01
-\tEVENT_END_COND sim/flightmodel2/gear/on_ground[0] == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.groundRoll) {
-                    output += `# Ground Roll Rumble
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/ground/rumble
-\tVEH_XYZ 0.000 0.000 0.000
-\tEVENT_START_COND sim/flightmodel2/gear/on_ground[0] == 1 AND sim/flightmodel/position/groundspeed > 5
-\tEVENT_END_COND sim/flightmodel2/gear/on_ground[0] == 0 OR sim/flightmodel/position/groundspeed < 5
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.brakes) {
-                    output += `# Brake Squeal
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/brakes/squeal
-\tVEH_XYZ 0.000 -0.500 0.000
-\tEVENT_START_COND sim/cockpit2/controls/parking_brake_ratio > 0.5 AND sim/flightmodel/position/groundspeed > 1
-\tEVENT_END_COND sim/cockpit2/controls/parking_brake_ratio < 0.5 OR sim/flightmodel/position/groundspeed < 1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.flaps) {
-                    output += `# Flaps Extension
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/flaps/extension
-\tVEH_XYZ 0.000 0.000 2.000
-\tEVENT_START_COND sim/flightmodel2/controls/flap_handle_deploy_ratio > 0
-\tEVENT_END_COND sim/flightmodel2/wing/flap1_deg[0] == sim/aircraft/overflow/acf_flap_detents[0] OR sim/flightmodel2/wing/flap1_deg[0] == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.spoilers) {
-                    output += `# Spoilers/Speedbrakes
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/spoilers/deploy
-\tVEH_XYZ 0.000 0.000 1.000
-\tEVENT_START_COND sim/flightmodel2/controls/speedbrake_ratio > 0.1
-\tEVENT_END_COND sim/flightmodel2/controls/speedbrake_ratio < 0.1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.trimWheel) {
-                    output += `# Trim Wheel
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/trim/wheel
-\tVEH_XYZ 0.000 0.500 0.000
-\tEVENT_CMND_CUE sim/flight_controls/pitch_trim_down
-END_SOUND_ATTACHMENT
-
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/trim/wheel
-\tVEH_XYZ 0.000 0.500 0.000
-\tEVENT_CMND_CUE sim/flight_controls/pitch_trim_up
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.stallWarning) {
-                    output += `# Stall Warning
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/warning/stall
-\tVEH_XYZ 0.000 0.500 -0.500
-\tEVENT_START_COND sim/flightmodel/failures/stallwarning_on == 1
-\tEVENT_END_COND sim/flightmodel/failures/stallwarning_on == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.gearWarning) {
-                    output += `# Gear Warning Horn
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/warning/gear_horn
-\tVEH_XYZ 0.000 0.500 -0.500
-\tEVENT_START_COND sim/cockpit2/annunciators/gear_warning == 1
-\tEVENT_END_COND sim/cockpit2/annunciators/gear_warning == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.overspeed) {
-                    output += `# Overspeed Warning
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/warning/overspeed
-\tVEH_XYZ 0.000 0.500 -0.500
-\tEVENT_START_COND sim/flightmodel/failures/over_vne == 1
-\tEVENT_END_COND sim/flightmodel/failures/over_vne == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.masterWarning) {
-                    output += `# Master Warning/Caution
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/warning/master_warning
-\tVEH_XYZ 0.000 0.500 -0.500
-\tEVENT_START_COND sim/cockpit2/annunciators/master_warning == 1
-\tEVENT_END_COND sim/cockpit2/annunciators/master_warning == 0
-END_SOUND_ATTACHMENT
-
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/warning/master_caution
-\tVEH_XYZ 0.000 0.500 -0.500
-\tEVENT_START_COND sim/cockpit2/annunciators/master_caution == 1
-\tEVENT_END_COND sim/cockpit2/annunciators/master_caution == 0
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.wind) {
-                    output += `# Wind Noise
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/environment/wind
-\tVEH_XYZ 0.000 0.500 0.000
-\tEVENT_START_COND sim/flightmodel/position/indicated_airspeed > 30
-\tEVENT_END_COND sim/flightmodel/position/indicated_airspeed < 30
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                if (templateSounds.rain) {
-                    output += `# Rain on Canopy
-BEGIN_SOUND_ATTACHMENT
-\tEVENT_NAME /aircraft/environment/rain
-\tVEH_XYZ 0.000 1.000 0.000
-\tEVENT_START_COND sim/weather/rain_percent > 0.1
-\tEVENT_END_COND sim/weather/rain_percent < 0.1
-END_SOUND_ATTACHMENT
-
-`;
-                }
-
-                return output;
-            }
-
-            generate(manipulators, eventName, useHoldCue, duplicateForRelease, templateSounds) {
-                let output = this.getHeader();
-
-                output += "# Template Sound Blocks\n";
-                output += "#############################################################################################\n";
-                output += this.generateTemplateSounds(templateSounds);
-                output += "\n";
-
-                output += "# Manipulator Sounds\n";
-                output += "#############################################################################################\n";
-
-                const seenCommands = new Set();
-
-                for (const manip of manipulators) {
-                    if (seenCommands.has(manip.command)) continue;
-                    seenCommands.add(manip.command);
-
-                    if (manip.tooltip) {
-                        output += `# ${manip.tooltip}\n`;
-                    }
-
-                    output += 'BEGIN_SOUND_ATTACHMENT\n';
-                    output += `\tEVENT_NAME ${eventName}\n`;
-                    output += `\tVEH_XYZ ${manip.xyz[0].toFixed(3)} ${manip.xyz[1].toFixed(3)} ${manip.xyz[2].toFixed(3)}\n`;
-
-                    if (useHoldCue) {
-                        output += `\tEVENT_CMND_HOLD_CUE ${manip.command}\n`;
-                    } else {
-                        output += `\tEVENT_CMND_CUE ${manip.command}\n`;
-                    }
-
-                    output += 'END_SOUND_ATTACHMENT\n\n';
-
-                    if (duplicateForRelease) {
-                        output += `# ${manip.tooltip || manip.command} - Release\n`;
-                        output += 'BEGIN_SOUND_ATTACHMENT\n';
-                        output += `\tEVENT_NAME ${eventName}\n`;
-                        output += `\tVEH_XYZ ${manip.xyz[0].toFixed(3)} ${manip.xyz[1].toFixed(3)} ${manip.xyz[2].toFixed(3)}\n`;
-                        output += `\tEVENT_CMND_UP ${manip.command}\n`;
-                        output += 'END_SOUND_ATTACHMENT\n\n';
-                    }
-                }
-
-                return output;
-            }
-        }
 
         // COMPARE MODAL FUNCTIONS (NEW)
         let currentDiffs = [];
@@ -3232,11 +3461,7 @@ END_SOUND_ATTACHMENT
                 return;
             }
 
-            // Show first 100 changes to prevent lag if there are thousands
-            const limit = 100;
-            const diffsToShow = currentDiffs.slice(0, limit);
-
-            diffsToShow.forEach(diff => {
+            currentDiffs.forEach(diff => {
                 const tr = document.createElement('tr');
                 tr.className = `compare-row ${diff.selected ? '' : 'deselected'}`;
 
@@ -3267,14 +3492,6 @@ END_SOUND_ATTACHMENT
                 `;
                 tbody.appendChild(tr);
             });
-
-            if (currentDiffs.length > limit) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="3" style="text-align: center; color: var(--text-muted);">
-                    ... and ${currentDiffs.length - limit} more changes (hidden for performance)
-                </td>`;
-                tbody.appendChild(tr);
-            }
         }
 
         function toggleDiff(id, checked) {
@@ -3459,233 +3676,6 @@ END_SOUND_ATTACHMENT
         }
 
         // SND Event Parser - extracts event paths from .snd file
-        class SNDEventParser {
-            constructor(sndContent) {
-                this.content = sndContent;
-            }
-
-            extractEvents() {
-                const lines = this.content.split('\n');
-                const events = new Set();
-
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (trimmed.startsWith('EVENT_NAME')) {
-                        const parts = trimmed.split(/\s+/);
-                        if (parts.length >= 2) {
-                            const eventPath = parts.slice(1).join(' ');
-                            if (eventPath.startsWith('/')) {
-                                events.add(eventPath);
-                            }
-                        }
-                    }
-                }
-
-                return Array.from(events).sort();
-            }
-        }
-
-        // FMOD Package Builder - creates ZIP with folder structure
-        class FMODPackageBuilder {
-            constructor(packageName, createPlaceholders, includeReadme) {
-                this.packageName = packageName;
-                this.createPlaceholders = createPlaceholders;
-                this.includeReadme = includeReadme;
-                this.stats = {
-                    folders: 0,
-                    files: 0
-                };
-            }
-
-            async build(events) {
-                const zip = new JSZip();
-
-                // Create folder structure for each event
-                for (const eventPath of events) {
-                    // Convert /aircraft/generic/switch to aircraft/generic/switch/
-                    const cleanPath = eventPath.substring(1); // Remove leading /
-                    const parts = cleanPath.split('/');
-                    const eventName = parts[parts.length - 1] || 'event';
-                    const folderPath = cleanPath;
-
-                    // Create folder
-                    const folder = zip.folder(folderPath);
-                    this.stats.folders++;
-
-                    // Create placeholder audio file if requested
-                    if (this.createPlaceholders) {
-                        // Create minimal WAV file header (empty 1 second mono 44.1kHz)
-                        const wavData = this.createEmptyWav();
-                        folder.file(`${eventName}.wav`, wavData);
-                        this.stats.files++;
-                    }
-
-                    // Create event metadata file
-                    const metadata = {
-                        eventPath: eventPath,
-                        eventName: eventName,
-                        generatedBy: 'X-Plane SND Generator',
-                        timestamp: new Date().toISOString(),
-                        note: 'Replace placeholder audio with your actual sound file'
-                    };
-                    folder.file('_event_info.json', JSON.stringify(metadata, null, 2));
-                    this.stats.files++;
-                }
-
-                // Create README if requested
-                if (this.includeReadme) {
-                    const readme = this.generateReadme(events);
-                    zip.file('README.txt', readme);
-                    this.stats.files++;
-                }
-
-                // Create structure map
-                const structureMap = this.generateStructureMap(events);
-                zip.file('_STRUCTURE_MAP.txt', structureMap);
-                this.stats.files++;
-
-                // Generate ZIP blob
-                return await zip.generateAsync({
-                    type: 'blob',
-                    compression: 'DEFLATE',
-                    compressionOptions: { level: 6 }
-                });
-            }
-
-            createEmptyWav() {
-                // Create a minimal valid WAV file (1 second of silence, mono, 44.1kHz, 16-bit)
-                const sampleRate = 44100;
-                const numChannels = 1;
-                const bitsPerSample = 16;
-                const duration = 1; // 1 second
-                const numSamples = sampleRate * duration;
-                const dataSize = numSamples * numChannels * (bitsPerSample / 8);
-                const fileSize = 44 + dataSize;
-
-                const buffer = new ArrayBuffer(fileSize);
-                const view = new DataView(buffer);
-
-                // RIFF header
-                this.writeString(view, 0, 'RIFF');
-                view.setUint32(4, fileSize - 8, true);
-                this.writeString(view, 8, 'WAVE');
-
-                // fmt chunk
-                this.writeString(view, 12, 'fmt ');
-                view.setUint32(16, 16, true); // fmt chunk size
-                view.setUint16(20, 1, true); // audio format (PCM)
-                view.setUint16(22, numChannels, true);
-                view.setUint32(24, sampleRate, true);
-                view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // byte rate
-                view.setUint16(32, numChannels * (bitsPerSample / 8), true); // block align
-                view.setUint16(34, bitsPerSample, true);
-
-                // data chunk
-                this.writeString(view, 36, 'data');
-                view.setUint32(40, dataSize, true);
-
-                // Audio data (silence = all zeros, already initialized)
-
-                return buffer;
-            }
-
-            writeString(view, offset, string) {
-                for (let i = 0; i < string.length; i++) {
-                    view.setUint8(offset + i, string.charCodeAt(i));
-                }
-            }
-
-            generateReadme(events) {
-                return `X-PLANE FMOD STUDIO PACKAGE
-Generated: ${new Date().toLocaleString()}
-Package: ${this.packageName}
-
-===========================================
-INSTALLATION INSTRUCTIONS
-===========================================
-
-1. Extract this ZIP file
-2. Open your FMOD Studio project
-3. Navigate to the Events folder in the Events tab
-4. Drag and drop the extracted folders into your Events folder
-5. Replace placeholder .wav files with your actual audio files
-6. Build your FMOD banks
-
-===========================================
-FOLDER STRUCTURE
-===========================================
-
-This package contains ${events.length} event paths organized into folders:
-
-${events.map(e => `  ${e}`).join('\n')}
-
-===========================================
-PLACEHOLDER FILES
-===========================================
-
-${this.createPlaceholders ?
-                        `Each event folder contains:
-  - [event_name].wav - Placeholder audio file (1 second silence)
-  - _event_info.json - Event metadata
-
-Replace the .wav files with your actual sound files.
-The _event_info.json files are for reference only.` :
-                        `Each event folder contains:
-  - _event_info.json - Event metadata
-
-Add your .wav audio files to each folder.`}
-
-===========================================
-NOTES
-===========================================
-
-- Event paths match your .snd file exactly
-- File names should match the last segment of the event path
-- You can rename audio files within FMOD Studio
-- Keep the folder structure intact for proper event mapping
-
-===========================================
-EXPERIMENTAL FEATURE
-===========================================
-
-This package generator is experimental. Please verify
-the folder structure matches your FMOD Studio project
-requirements before importing.
-
-For questions or issues, refer to the X-Plane FMOD
-documentation or community forums.
-`;
-            }
-
-            generateStructureMap(events) {
-                let output = `FMOD STUDIO EVENT STRUCTURE MAP\n`;
-                output += `Generated: ${new Date().toLocaleString()}\n`;
-                output += `Package: ${this.packageName}\n`;
-                output += `Total Events: ${events.length}\n`;
-                output += `\n${'='.repeat(60)}\n\n`;
-
-                // Group events by top-level folder
-                const grouped = {};
-                for (const event of events) {
-                    const parts = event.split('/').filter(p => p);
-                    const topLevel = parts[0] || 'root';
-                    if (!grouped[topLevel]) grouped[topLevel] = [];
-                    grouped[topLevel].push(event);
-                }
-
-                for (const [category, paths] of Object.entries(grouped)) {
-                    output += `${category}/\n`;
-                    for (const path of paths) {
-                        const indent = '  '.repeat(path.split('/').length - 2);
-                        const name = path.split('/').pop();
-                        output += `${indent}├─ ${name}\n`;
-                    }
-                    output += '\n';
-                }
-
-                return output;
-            }
-        }
     </script>
 </body>
 
