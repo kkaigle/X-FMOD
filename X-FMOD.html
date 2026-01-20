@@ -993,6 +993,25 @@
             flex: 1;
         }
 
+        .category-chip {
+            display: inline-flex;
+            align-items: center;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 4px 12px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: var(--text);
+            user-select: none;
+        }
+
+        .category-chip:hover {
+            border-color: var(--primary);
+            background: var(--bg-hover);
+        }
+
         .review-footer {
             background: var(--bg-secondary);
             padding: 1.5rem 2rem;
@@ -1454,6 +1473,23 @@
                             <label for="excludeNoop">No-op</label>
                         </div>
                     </div>
+
+                    <div class="form-group"
+                        style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                        <label class="form-label">Category Creation</label>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <input type="text" id="categoryInput" class="entry-input"
+                                placeholder="e.g. switches, knobs, warnings" style="flex:1;">
+                            <button class="btn btn-secondary" onclick="addCategory()"
+                                style="padding: 0.5rem 1rem;">Add</button>
+                        </div>
+                        <div id="categoryList" style="min-height: 20px;">
+                            <!-- Categories will appear here -->
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">
+                            Create custom groups to organize your sounds. You can assign these in the review step.
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Template Sounds -->
@@ -1902,6 +1938,7 @@
         let nextEntryId = 1;
         let currentDiffs = [];
         let currentFilename = 'aircraft_sounds.snd';
+        let userCategories = [];
 
         // ========================================================================
         // CLASS DEFINITIONS
@@ -3288,9 +3325,18 @@ documentation or community forums.
                 </div>
                 
                 <div class="entry-grid">
-                    <div class="entry-field full-width">
+                    <div class="entry-field">
+                        <label class="entry-label">Category</label>
+                        <select class="entry-select" onchange="updateEntryCategory('${entry.id}', this.value)">
+                            <option value="generic">Generic</option>
+                            ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            <option value="custom">Custom (Type below)</option>
+                        </select>
+                    </div>
+
+                    <div class="entry-field">
                         <label class="entry-label">Event Name</label>
-                        <input type="text" class="entry-input" value="${escapeHtml(entry.eventName)}" 
+                        <input type="text" class="entry-input" data-field="eventName" value="${escapeHtml(entry.eventName)}" 
                                onchange="updateEntryField('${entry.id}', 'eventName', this.value)">
                     </div>
                     
@@ -3447,6 +3493,73 @@ documentation or community forums.
             closeReviewModal();
 
             log(`Downloaded customized .snd file with ${soundEntries.filter(e => !e.deleted).length} entries`, 'success');
+        }
+
+        // CATEGORY MANAGEMENT
+        function addCategory() {
+            const input = document.getElementById('categoryInput');
+            const category = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+            if (category && !userCategories.includes(category)) {
+                userCategories.push(category);
+                input.value = '';
+                renderCategories();
+            } else if (userCategories.includes(category)) {
+                alert('Category already exists!');
+            }
+        }
+
+        function removeCategory(index) {
+            userCategories.splice(index, 1);
+            renderCategories();
+        }
+
+        function renderCategories() {
+            const list = document.getElementById('categoryList');
+            if (!list) return; // Guard if UI not present
+
+            list.innerHTML = userCategories.map((cat, i) => `
+                <div class="category-chip">
+                    ${cat}
+                    <span onclick="removeCategory(${i})" style="cursor:pointer; margin-left:5px;">&times;</span>
+                </div>
+            `).join('');
+        }
+
+        function updateEntryCategory(entryId, category) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (!entry) return;
+
+            if (category === 'custom') {
+                return; // Do nothing, let user edit manually
+            }
+
+            // Replace current "folder" in path
+            // Assuming format /aircraft/FOLDER/name or /aircraft/name
+
+            let parts = entry.eventName.split('/');
+            // Standard path: ["", "aircraft", "generic", "name"] -> length 4
+
+            if (category === 'generic') {
+                // Reset to generic if possible, or just replace current category section
+                if (parts.length >= 4) {
+                    parts[2] = 'generic';
+                    const newName = parts.join('/');
+                    updateEntryField(entryId, 'eventName', newName);
+                    // Also update the input field visually
+                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+                    if (input) input.value = newName;
+                }
+            } else {
+                if (parts.length >= 4) {
+                    parts[2] = category;
+                    const newName = parts.join('/');
+                    updateEntryField(entryId, 'eventName', newName);
+                    // Also update the input field visually
+                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+                    if (input) input.value = newName;
+                }
+            }
         }
 
         function escapeHtml(text) {
