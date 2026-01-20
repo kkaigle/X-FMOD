@@ -2036,6 +2036,7 @@
         let generatedContent = null;
         let currentMode = 'generate';
 
+
         // Review system state
         let soundEntries = [];
         let currentFilter = 'all';
@@ -2891,8 +2892,6 @@ documentation or community forums.
         });
 
         // File drop zones for UPDATE mode
-        let objFileContentUpdate = null;
-        let sndFileContent = null;
         let updatedContent = null;
 
         setupDropZone('objDropZoneUpdate', 'objFileUpdate', (content, filename) => {
@@ -2905,18 +2904,16 @@ documentation or community forums.
             showFileInfo('sndFileInfo', filename, content.length);
         });
 
-        // File drop zone for FMOD mode
-        let sndFileFmodContent = null;
-        let fmodPackageBlob = null;
-
-        setupDropZone('sndDropZoneFmod', 'sndFileFmod', (content, filename) => {
-            sndFileFmodContent = content;
-            showFileInfo('sndFileInfoFmod', filename, content.length);
-        });
+        // File drop zone for FMOD mode - REMOVED
 
         function setupDropZone(dropZoneId, inputId, callback) {
             const dropZone = document.getElementById(dropZoneId);
             const fileInput = document.getElementById(inputId);
+
+            if (!dropZone || !fileInput) {
+                console.warn(`Skipping setup: Element ${dropZoneId} or ${inputId} not found`);
+                return; // Safety check: Exit if elements are not found
+            }
 
             dropZone.addEventListener('click', () => fileInput.click());
 
@@ -3102,340 +3099,352 @@ documentation or community forums.
                     return;
                 }
 
-                currentDiffs = results.diffs;
-                const stats = results.stats;
-                let matched = stats.matched.length;
-                let unmatched = stats.unmatched.length;
+                currentDiffs = results.changes; // Corrected from results.diffs
+                const stats = { // Reconstruct stats object based on identifyChanges return
+                    totalEntries: results.totalEntries,
+                    matched: results.matched,
+                    unmatched: results.unmatched
+                };
 
                 // Log Results
-                log(`Found ${matched} matches and ${unmatched} unmatched commands`, 'info', 'consoleUpdate');
+                log(`Found ${stats.matched} matches and ${stats.unmatched.length} unmatched commands`, 'info', 'consoleUpdate');
 
                 if (currentDiffs.length === 0) {
                     log('No coordinate differences found.', 'success', 'consoleUpdate');
                     progressFill.style.width = '100%';
+                    document.getElementById('updateBtn').disabled = false; // Re-enable button
+                    setTimeout(() => {
+                        progressBar.classList.add('hidden');
+                    }, 1000);
                     return;
                 }
 
                 log(`Identified ${currentDiffs.length} coordinate updates needed`, 'warning', 'consoleUpdate');
 
                 // Open Compare Modal
-                openCompareModal(currentDiffs, commandMap.size, matched, unmatched);
+                openCompareModal(currentDiffs, stats.totalEntries, stats.matched, stats.unmatched);
 
                 progressFill.style.width = '100%';
                 setTimeout(() => {
                     progressBar.classList.add('hidden');
                 }, 1000);
 
-                return entries;
+            } catch (error) {
+                log('ERROR: ' + error.message, 'error', 'consoleUpdate');
+                console.error(error);
+                progressFill.style.width = '0';
+                setTimeout(() => progressBar.classList.add('hidden'), 500);
+                document.getElementById('updateBtn').disabled = false; // Re-enable button on error
             }
+        }
 
         // GENERATE MODE FUNCTION (same as before)
         async function generateSND() {
-                if (!objFileContent) {
-                    alert('Please upload a cockpit.obj file first!');
-                    return;
-                }
-
-                const startTime = performance.now();
-
-                document.getElementById('outputSection').classList.remove('hidden');
-                clearConsole();
-                document.getElementById('statsGrid').classList.add('hidden');
-                document.getElementById('downloadBtn').classList.add('hidden');
-
-                const progressBar = document.getElementById('progressBar');
-                const progressFill = document.getElementById('progressFill');
-                progressBar.classList.remove('hidden');
-                progressFill.style.width = '10%';
-
-                document.getElementById('generateBtn').disabled = true;
-
-                log('Starting generation...', 'info');
-
-                try {
-                    const parser = new OBJParser(objFileContent);
-                    const result = parser.parse();
-
-                    progressFill.style.width = '30%';
-                    log(`Found ${result.vertices.length} vertices`, 'success');
-                    log(`Found ${result.manipulators.length} manipulators`, 'success');
-
-                    const filters = getFilterSettings();
-                    const filteredManips = result.manipulators.filter(manip => {
-                        if (filters.excludeDragAxis && manip.manipType === 'drag_axis') return false;
-                        if (filters.excludeDragXY && manip.manipType === 'drag_xy') return false;
-                        if (filters.excludeAxisKnob && manip.manipType === 'axis_knob') return false;
-                        if (filters.excludeNoop && manip.manipType === 'noop') return false;
-                        return true;
-                    });
-
-                    const filteredCount = result.manipulators.length - filteredManips.length;
-                    if (filteredCount > 0) {
-                        log(`Filtered out ${filteredCount} manipulators`, 'warning');
-                    }
-
-                    progressFill.style.width = '60%';
-
-                    let layoutParent = document.getElementById('parentCategory').value.trim() || 'aircraft';
-                    let eventName = document.getElementById('eventName').value;
-
-                    if (eventName === 'custom') {
-                        eventName = document.getElementById('customEventName').value || `/${layoutParent}/generic/switch`;
-                    } else {
-                        // Replace the default "aircraft" root with the user's chosen root
-                        eventName = eventName.replace(/^\/aircraft/, `/${layoutParent}`);
-                    }
-
-                    const useHoldCue = document.getElementById('useHoldCue').checked;
-                    const duplicateForRelease = document.getElementById('duplicateForRelease').checked;
-                    const outputFilename = document.getElementById('outputName').value || 'output.snd';
-
-                    const generator = new SNDGenerator(templateFileContent);
-                    const templateSounds = getTemplateSoundSettings();
-                    generatedContent = generator.generate(filteredManips, eventName, useHoldCue, duplicateForRelease, templateSounds);
-
-                    progressFill.style.width = '100%';
-
-                    const endTime = performance.now();
-                    const processingTime = Math.round(endTime - startTime);
-
-                    log('Generation complete!', 'success');
-
-                    const uniqueCommands = new Set(filteredManips.map(m => m.command)).size;
-                    const templateCount = Object.values(templateSounds).filter(v => v).length;
-                    const duplicatedCount = duplicateForRelease ? uniqueCommands * 2 : uniqueCommands;
-                    const totalEntries = duplicatedCount + templateCount;
-
-                    document.getElementById('statVertices').textContent = result.vertices.length.toLocaleString();
-                    document.getElementById('statManipulators').textContent = result.manipulators.length.toLocaleString();
-                    document.getElementById('statFiltered').textContent = uniqueCommands.toLocaleString();
-                    document.getElementById('statDuplicated').textContent = duplicatedCount.toLocaleString();
-                    document.getElementById('statTemplates').textContent = templateCount.toLocaleString();
-                    document.getElementById('statTotal').textContent = totalEntries.toLocaleString();
-                    document.getElementById('statTime').textContent = processingTime + 'ms';
-                    document.getElementById('statsGrid').classList.remove('hidden');
-
-                    // Parse generated content into entries and show review modal
-                    soundEntries = parseSNDToEntries(generatedContent);
-
-                    const downloadBtn = document.getElementById('downloadBtn');
-                    downloadBtn.classList.remove('hidden');
-                    downloadBtn.textContent = 'Review & Customize';
-
-                    // Use a direct onclick for reliability + logging
-                    downloadBtn.onclick = function (e) {
-                        e.preventDefault();
-                        console.log('Button clicked (onclick)! Output:', outputFilename);
-                        console.log('Sound Entries count:', soundEntries ? soundEntries.length : 'null');
-
-                        if (!soundEntries || soundEntries.length === 0) {
-                            alert('No sound entries generated! Please check the console for parsing errors.');
-                            return;
-                        }
-
-                        try {
-                            openReviewModal(outputFilename);
-                        } catch (err) {
-                            console.error('CRITICAL: Failed to open modal:', err);
-                            alert('Failed to open modal: ' + err.message);
-                        }
-                    };
-
-                    log(`Button ready. Entries generated: ${soundEntries.length}`, 'info');
-
-                    log(`Generated ${totalEntries} total sound entries - Click "Review & Customize" to edit`, 'info');
-
-                    setTimeout(() => {
-                        progressBar.classList.add('hidden');
-                        progressFill.style.width = '0';
-                    }, 500);
-
-                } catch (error) {
-                    log('ERROR: ' + error.message, 'error');
-                    progressFill.style.width = '0';
-                    setTimeout(() => progressBar.classList.add('hidden'), 500);
-                }
-
-                document.getElementById('generateBtn').disabled = false;
+            if (!objFileContent) {
+                alert('Please upload a cockpit.obj file first!');
+                return;
             }
 
-            function downloadFile(content, filename) {
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            const startTime = performance.now();
 
-                const consoleId = currentMode === 'update' ? 'consoleUpdate' : 'console';
-                log('Downloaded: ' + filename, 'success', consoleId);
-            }
+            document.getElementById('outputSection').classList.remove('hidden');
+            clearConsole();
+            document.getElementById('statsGrid').classList.add('hidden');
+            document.getElementById('downloadBtn').classList.add('hidden');
 
-            // ========================================================================
-            // REVIEW MODAL FUNCTIONS
-            // ========================================================================
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            progressBar.classList.remove('hidden');
+            progressFill.style.width = '10%';
 
+            document.getElementById('generateBtn').disabled = true;
 
+            log('Starting generation...', 'info');
 
-            function openReviewModal(filename) {
-                console.log('openReviewModal called with:', filename);
-                currentFilename = filename;
-                try {
-                    renderReviewModal();
-                    document.getElementById('reviewModal').classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                    console.log('Review modal opened');
-                } catch (e) {
-                    console.error('Error opening review modal:', e);
-                    alert('Error opening review modal: ' + e.message);
-                }
-            }
+            try {
+                const parser = new OBJParser(objFileContent);
+                const result = parser.parse();
 
-            function closeReviewModal() {
-                document.getElementById('reviewModal').classList.remove('active');
-                document.body.style.overflow = 'auto';
-            }
+                progressFill.style.width = '30%';
+                log(`Found ${result.vertices.length} vertices`, 'success');
+                log(`Found ${result.manipulators.length} manipulators`, 'success');
 
-            function renderReviewModal() {
-                const body = document.getElementById('reviewBody');
-                body.innerHTML = '';
-
-                const filtered = getFilteredEntries();
-
-                filtered.forEach((entry, index) => {
-                    const card = createEntryCard(entry, index);
-                    body.appendChild(card);
+                const filters = getFilterSettings();
+                const filteredManips = result.manipulators.filter(manip => {
+                    if (filters.excludeDragAxis && manip.manipType === 'drag_axis') return false;
+                    if (filters.excludeDragXY && manip.manipType === 'drag_xy') return false;
+                    if (filters.excludeAxisKnob && manip.manipType === 'axis_knob') return false;
+                    if (filters.excludeNoop && manip.manipType === 'noop') return false;
+                    return true;
                 });
 
-                updateReviewStats();
-            }
-
-            function getFilteredEntries() {
-                let entries = soundEntries;
-
-                // Text Search
-                if (searchText) {
-                    const lower = searchText.toLowerCase();
-                    entries = entries.filter(e =>
-                        e.eventName.toLowerCase().includes(lower) ||
-                        e.comment.toLowerCase().includes(lower) ||
-                        e.command.toLowerCase().includes(lower) ||
-                        e.startCond.toLowerCase().includes(lower)
-                    );
+                const filteredCount = result.manipulators.length - filteredManips.length;
+                if (filteredCount > 0) {
+                    log(`Filtered out ${filteredCount} manipulators`, 'warning');
                 }
 
-                // Category/Status Filter
-                switch (currentFilter) {
-                    case 'template':
-                        return entries.filter(e => e.isTemplate);
-                    case 'manip':
-                        return entries.filter(e => !e.isTemplate);
-                    case 'deleted':
-                        return entries.filter(e => e.deleted);
-                    case 'pending':
-                        return entries.filter(e => !e.deleted && !e.completed);
-                    case 'completed':
-                        return entries.filter(e => !e.deleted && e.completed);
-                    case 'all':
-                    default:
-                        return entries;
+                progressFill.style.width = '60%';
+
+                let layoutParent = document.getElementById('parentCategory').value.trim() || 'aircraft';
+                let eventName = document.getElementById('eventName').value;
+
+                if (eventName === 'custom') {
+                    eventName = document.getElementById('customEventName').value || `/${layoutParent}/generic/switch`;
+                } else {
+                    // Replace the default "aircraft" root with the user's chosen root
+                    eventName = eventName.replace(/^\/aircraft/, `/${layoutParent}`);
                 }
+
+                const useHoldCue = document.getElementById('useHoldCue').checked;
+                const duplicateForRelease = document.getElementById('duplicateForRelease').checked;
+                const outputFilename = document.getElementById('outputName').value || 'output.snd';
+
+                const generator = new SNDGenerator(templateFileContent);
+                const templateSounds = getTemplateSoundSettings();
+                generatedContent = generator.generate(filteredManips, eventName, useHoldCue, duplicateForRelease, templateSounds);
+
+                progressFill.style.width = '100%';
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                log('Generation complete!', 'success');
+
+                const uniqueCommands = new Set(filteredManips.map(m => m.command)).size;
+                const templateCount = Object.values(templateSounds).filter(v => v).length;
+                const duplicatedCount = duplicateForRelease ? uniqueCommands * 2 : uniqueCommands;
+                const totalEntries = duplicatedCount + templateCount;
+
+                document.getElementById('statVertices').textContent = result.vertices.length.toLocaleString();
+                document.getElementById('statManipulators').textContent = result.manipulators.length.toLocaleString();
+                document.getElementById('statFiltered').textContent = uniqueCommands.toLocaleString();
+                document.getElementById('statDuplicated').textContent = duplicatedCount.toLocaleString();
+                document.getElementById('statTemplates').textContent = templateCount.toLocaleString();
+                document.getElementById('statTotal').textContent = totalEntries.toLocaleString();
+                document.getElementById('statTime').textContent = processingTime + 'ms';
+                document.getElementById('statsGrid').classList.remove('hidden');
+
+                // Parse generated content into entries and show review modal
+                soundEntries = parseSNDToEntries(generatedContent);
+
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.classList.remove('hidden');
+                downloadBtn.textContent = 'Review & Customize';
+
+                // Use a direct onclick for reliability + logging
+                downloadBtn.onclick = function (e) {
+                    e.preventDefault();
+                    console.log('Button clicked (onclick)! Output:', outputFilename);
+                    console.log('Sound Entries count:', soundEntries ? soundEntries.length : 'null');
+
+                    if (!soundEntries || soundEntries.length === 0) {
+                        alert('No sound entries generated! Please check the console for parsing errors.');
+                        return;
+                    }
+
+                    try {
+                        openReviewModal(outputFilename);
+                    } catch (err) {
+                        console.error('CRITICAL: Failed to open modal:', err);
+                        alert('Failed to open modal: ' + err.message);
+                    }
+                };
+
+                log(`Button ready. Entries generated: ${soundEntries.length}`, 'info');
+
+                log(`Generated ${totalEntries} total sound entries - Click "Review & Customize" to edit`, 'info');
+
+                setTimeout(() => {
+                    progressBar.classList.add('hidden');
+                    progressFill.style.width = '0';
+                }, 500);
+
+            } catch (error) {
+                log('ERROR: ' + error.message, 'error');
+                progressFill.style.width = '0';
+                setTimeout(() => progressBar.classList.add('hidden'), 500);
             }
 
-            function updateSearch(val) {
-                searchText = val;
+            document.getElementById('generateBtn').disabled = false;
+        }
+
+        function downloadFile(content, filename) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            const consoleId = currentMode === 'update' ? 'consoleUpdate' : 'console';
+            log('Downloaded: ' + filename, 'success', consoleId);
+        }
+
+        // ========================================================================
+        // REVIEW MODAL FUNCTIONS
+        // ========================================================================
+
+
+
+        function openReviewModal(filename) {
+            console.log('openReviewModal called with:', filename);
+            currentFilename = filename;
+            try {
+                renderReviewModal();
+                document.getElementById('reviewModal').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                console.log('Review modal opened');
+            } catch (e) {
+                console.error('Error opening review modal:', e);
+                alert('Error opening review modal: ' + e.message);
+            }
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        function renderReviewModal() {
+            const body = document.getElementById('reviewBody');
+            body.innerHTML = '';
+
+            const filtered = getFilteredEntries();
+
+            filtered.forEach((entry, index) => {
+                const card = createEntryCard(entry, index);
+                body.appendChild(card);
+            });
+
+            updateReviewStats();
+        }
+
+        function getFilteredEntries() {
+            let entries = soundEntries;
+
+            // Text Search
+            if (searchText) {
+                const lower = searchText.toLowerCase();
+                entries = entries.filter(e =>
+                    e.eventName.toLowerCase().includes(lower) ||
+                    e.comment.toLowerCase().includes(lower) ||
+                    e.command.toLowerCase().includes(lower) ||
+                    e.startCond.toLowerCase().includes(lower)
+                );
+            }
+
+            // Category/Status Filter
+            switch (currentFilter) {
+                case 'template':
+                    return entries.filter(e => e.isTemplate);
+                case 'manip':
+                    return entries.filter(e => !e.isTemplate);
+                case 'deleted':
+                    return entries.filter(e => e.deleted);
+                case 'pending':
+                    return entries.filter(e => !e.deleted && !e.completed);
+                case 'completed':
+                    return entries.filter(e => !e.deleted && e.completed);
+                case 'all':
+                default:
+                    return entries;
+            }
+        }
+
+        function updateSearch(val) {
+            searchText = val;
+            renderReviewModal();
+        }
+
+        function toggleEntryComplete(entryId, completed) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.completed = completed;
                 renderReviewModal();
             }
+        }
 
-            function toggleEntryComplete(entryId, completed) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (entry) {
-                    entry.completed = completed;
-                    renderReviewModal();
-                }
+        function toggleEntrySelected(entryId, selected) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.selected = selected;
+                updateBulkActionsUI();
             }
+        }
 
-            function toggleEntrySelected(entryId, selected) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (entry) {
-                    entry.selected = selected;
-                    updateBulkActionsUI();
-                }
-            }
+        function updateBulkActionsUI() {
+            const selectedCount = soundEntries.filter(e => e.selected).length;
+            document.getElementById('selectedCount').textContent = selectedCount;
 
-            function updateBulkActionsUI() {
-                const selectedCount = soundEntries.filter(e => e.selected).length;
-                document.getElementById('selectedCount').textContent = selectedCount;
+            const panel = document.getElementById('bulkActionsPanel');
+            if (selectedCount > 0) {
+                panel.classList.remove('hidden');
 
-                const panel = document.getElementById('bulkActionsPanel');
-                if (selectedCount > 0) {
-                    panel.classList.remove('hidden');
-
-                    // Refresh categories in bulk dropdown
-                    const bulkCat = document.getElementById('bulkCategory');
-                    bulkCat.innerHTML = `<option value="">Set Category...</option>
+                // Refresh categories in bulk dropdown
+                const bulkCat = document.getElementById('bulkCategory');
+                bulkCat.innerHTML = `<option value="">Set Category...</option>
                                      <option value="generic">Generic</option>
                                      ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}`;
-                } else {
-                    panel.classList.add('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function applyBulkUpdate() {
+            const selectedEntries = soundEntries.filter(e => e.selected);
+            if (selectedEntries.length === 0) return;
+
+            const category = document.getElementById('bulkCategory').value;
+            const trigger = document.getElementById('bulkTrigger').value;
+
+            selectedEntries.forEach(entry => {
+                if (category) {
+                    updateEntryCategory(entry.id, category);
                 }
-            }
+                if (trigger) {
+                    entry.triggerType = trigger;
+                }
+            });
 
-            function applyBulkUpdate() {
-                const selectedEntries = soundEntries.filter(e => e.selected);
-                if (selectedEntries.length === 0) return;
+            log(`Bulk updated ${selectedEntries.length} entries`, 'success');
+            renderReviewModal();
+        }
 
-                const category = document.getElementById('bulkCategory').value;
-                const trigger = document.getElementById('bulkTrigger').value;
+        function updateReviewStats() {
+            const total = soundEntries.length;
+            const deleted = soundEntries.filter(e => e.deleted).length;
+            const active = total - deleted;
+            const template = soundEntries.filter(e => e.isTemplate && !e.deleted).length;
+            const manip = soundEntries.filter(e => !e.isTemplate && !e.deleted).length;
+            const pending = soundEntries.filter(e => !e.deleted && !e.completed).length;
+            const completed = soundEntries.filter(e => !e.deleted && e.completed).length;
 
-                selectedEntries.forEach(entry => {
-                    if (category) {
-                        updateEntryCategory(entry.id, category);
-                    }
-                    if (trigger) {
-                        entry.triggerType = trigger;
-                    }
-                });
+            document.getElementById('totalEntries').textContent = total;
+            document.getElementById('activeEntries').textContent = active;
+            document.getElementById('deletedEntries').textContent = deleted;
+            document.getElementById('countAll').textContent = total;
+            document.getElementById('countTemplate').textContent = template;
+            document.getElementById('countManip').textContent = manip;
+            document.getElementById('countDeleted').textContent = deleted;
 
-                log(`Bulk updated ${selectedEntries.length} entries`, 'success');
-                renderReviewModal();
-            }
+            // New counters
+            if (document.getElementById('countPending')) document.getElementById('countPending').textContent = pending;
+            if (document.getElementById('countCompleted')) document.getElementById('countCompleted').textContent = completed;
+        }
 
-            function updateReviewStats() {
-                const total = soundEntries.length;
-                const deleted = soundEntries.filter(e => e.deleted).length;
-                const active = total - deleted;
-                const template = soundEntries.filter(e => e.isTemplate && !e.deleted).length;
-                const manip = soundEntries.filter(e => !e.isTemplate && !e.deleted).length;
-                const pending = soundEntries.filter(e => !e.deleted && !e.completed).length;
-                const completed = soundEntries.filter(e => !e.deleted && e.completed).length;
+        function createEntryCard(entry) {
+            const card = document.createElement('div');
+            const isCompleted = entry.completed;
+            const isSelected = entry.selected;
 
-                document.getElementById('totalEntries').textContent = total;
-                document.getElementById('activeEntries').textContent = active;
-                document.getElementById('deletedEntries').textContent = deleted;
-                document.getElementById('countAll').textContent = total;
-                document.getElementById('countTemplate').textContent = template;
-                document.getElementById('countManip').textContent = manip;
-                document.getElementById('countDeleted').textContent = deleted;
+            card.className = `sound-entry ${entry.deleted ? 'deleted' : ''} ${isCompleted ? 'completed' : ''}`;
+            card.id = `entry-${entry.id}`;
 
-                // New counters
-                if (document.getElementById('countPending')) document.getElementById('countPending').textContent = pending;
-                if (document.getElementById('countCompleted')) document.getElementById('countCompleted').textContent = completed;
-            }
-
-            function createEntryCard(entry) {
-                const card = document.createElement('div');
-                const isCompleted = entry.completed;
-                const isSelected = entry.selected;
-
-                card.className = `sound-entry ${entry.deleted ? 'deleted' : ''} ${isCompleted ? 'completed' : ''}`;
-                card.id = `entry-${entry.id}`;
-
-                if (entry.deleted) {
-                    card.innerHTML = `
+            if (entry.deleted) {
+                card.innerHTML = `
                     <div class="entry-header">
                         <div class="entry-title" style="text-decoration: line-through; opacity: 0.6;">${escapeHtml(entry.comment || entry.eventName)}</div>
                         <div class="entry-controls">
@@ -3446,10 +3455,10 @@ documentation or community forums.
                         This entry will not be included in the final .snd file. Click "Restore" to add it back.
                     </div>
                 `;
-                    return card;
-                }
+                return card;
+            }
 
-                card.innerHTML = `
+            card.innerHTML = `
                 <div class="entry-header">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <input type="checkbox" class="entry-select-checkbox" 
@@ -3527,20 +3536,20 @@ documentation or community forums.
                 </div>
             `;
 
-                return card;
-            }
+            return card;
+        }
 
-            // Helper to extract category for pre-selection
-            function getCategoryFromEvent(eventName) {
-                const parts = eventName.split('/');
-                if (parts.length > 2) return parts[2];
-                return 'generic';
-            }
+        // Helper to extract category for pre-selection
+        function getCategoryFromEvent(eventName) {
+            const parts = eventName.split('/');
+            if (parts.length > 2) return parts[2];
+            return 'generic';
+        }
 
-            function getTriggerFields(entry) {
-                switch (entry.triggerType) {
-                    case 'EVENT_START_COND':
-                        return `
+        function getTriggerFields(entry) {
+            switch (entry.triggerType) {
+                case 'EVENT_START_COND':
+                    return `
                         <div class="entry-field full-width">
                             <label class="entry-label">Start Condition (Dataref)</label>
                             <input type="text" class="entry-input" value="${escapeHtml(entry.startCond)}" 
@@ -3554,11 +3563,11 @@ documentation or community forums.
                                    placeholder="e.g., sim/flightmodel/engine/ENGN_running[0] == 0">
                         </div>
                     `;
-                    case 'EVENT_CMND_DOWN':
-                    case 'EVENT_CMND_UP':
-                    case 'EVENT_CMND_HOLD_STOP':
-                    case 'EVENT_CMND_HOLD_CUE':
-                        return `
+                case 'EVENT_CMND_DOWN':
+                case 'EVENT_CMND_UP':
+                case 'EVENT_CMND_HOLD_STOP':
+                case 'EVENT_CMND_HOLD_CUE':
+                    return `
                         <div class="entry-field full-width">
                             <label class="entry-label">Command</label>
                             <input type="text" class="entry-input" value="${escapeHtml(entry.command)}" 
@@ -3566,8 +3575,8 @@ documentation or community forums.
                                    placeholder="e.g., sim/flight_controls/landing_gear_toggle">
                         </div>
                     `;
-                    case 'CUE_TRIGGER_COND':
-                        return `
+                case 'CUE_TRIGGER_COND':
+                    return `
                         <div class="entry-field full-width">
                             <label class="entry-label">Cue Trigger Condition (Dataref)</label>
                             <input type="text" class="entry-input" value="${escapeHtml(entry.cueTrigger)}" 
@@ -3575,188 +3584,172 @@ documentation or community forums.
                                    placeholder="e.g., sim/cockpit2/gauges/indicators/altitude_ft_pilot < 500">
                         </div>
                     `;
-                    default:
-                        return '';
-                }
+                default:
+                    return '';
             }
+        }
 
-            function updateEntryField(entryId, field, value) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (entry) {
-                    entry[field] = value;
-                    updateReviewStats();
-                }
+        function updateEntryField(entryId, field, value) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry[field] = value;
+                updateReviewStats();
             }
+        }
 
-            function deleteEntry(entryId) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (entry) {
-                    entry.deleted = true;
-                    renderReviewModal();
-                }
-            }
-
-            function restoreEntry(entryId) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (entry) {
-                    entry.deleted = false;
-                    renderReviewModal();
-                }
-            }
-
-            function filterEntries(filter) {
-                currentFilter = filter;
-
-                document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-                event.target.classList.add('active');
-
+        function deleteEntry(entryId) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.deleted = true;
                 renderReviewModal();
             }
+        }
 
-            function updateReviewStats() {
-                const total = soundEntries.length;
-                const deleted = soundEntries.filter(e => e.deleted).length;
-                const active = total - deleted;
-                const template = soundEntries.filter(e => e.isTemplate && !e.deleted).length;
-                const manip = soundEntries.filter(e => !e.isTemplate && !e.deleted).length;
-
-                document.getElementById('totalEntries').textContent = total;
-                document.getElementById('activeEntries').textContent = active;
-                document.getElementById('deletedEntries').textContent = deleted;
-                document.getElementById('countAll').textContent = total;
-                document.getElementById('countTemplate').textContent = template;
-                document.getElementById('countManip').textContent = manip;
-                document.getElementById('countDeleted').textContent = deleted;
+        function restoreEntry(entryId) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.deleted = false;
+                renderReviewModal();
             }
+        }
 
-            function downloadReviewedSND() {
-                const header = generatedContent.split('BEGIN_SOUND_ATTACHMENT')[0];
-                let content = header;
+        function filterEntries(filter) {
+            currentFilter = filter;
 
-                soundEntries
-                    .filter(entry => !entry.deleted)
-                    .forEach(entry => {
-                        content += entry.toSND();
-                    });
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
 
-                downloadFile(content, currentFilename);
-                closeReviewModal();
+            renderReviewModal();
+        }
 
-                log(`Downloaded customized .snd file with ${soundEntries.filter(e => !e.deleted).length} entries`, 'success');
-            }
+        function downloadReviewedSND() {
+            const header = generatedContent.split('BEGIN_SOUND_ATTACHMENT')[0];
+            let content = header;
 
-            // CATEGORY MANAGEMENT
-            function addCategory() {
-                const input = document.getElementById('categoryInput');
-                const category = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            soundEntries
+                .filter(entry => !entry.deleted)
+                .forEach(entry => {
+                    content += entry.toSND();
+                });
 
-                if (category && !userCategories.includes(category)) {
-                    userCategories.push(category);
-                    input.value = '';
-                    renderCategories();
-                } else if (userCategories.includes(category)) {
-                    alert('Category already exists!');
-                }
-            }
+            downloadFile(content, currentFilename);
+            closeReviewModal();
 
-            function removeCategory(index) {
-                userCategories.splice(index, 1);
+            log(`Downloaded customized .snd file with ${soundEntries.filter(e => !e.deleted).length} entries`, 'success');
+        }
+
+        // CATEGORY MANAGEMENT
+        function addCategory() {
+            const input = document.getElementById('categoryInput');
+            const category = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+            if (category && !userCategories.includes(category)) {
+                userCategories.push(category);
+                input.value = '';
                 renderCategories();
+            } else if (userCategories.includes(category)) {
+                alert('Category already exists!');
             }
+        }
 
-            function renderCategories() {
-                const list = document.getElementById('categoryList');
-                if (!list) return; // Guard if UI not present
+        function removeCategory(index) {
+            userCategories.splice(index, 1);
+            renderCategories();
+        }
 
-                list.innerHTML = userCategories.map((cat, i) => `
+        function renderCategories() {
+            const list = document.getElementById('categoryList');
+            if (!list) return; // Guard if UI not present
+
+            list.innerHTML = userCategories.map((cat, i) => `
                 <div class="category-chip">
                     ${cat}
                     <span onclick="removeCategory(${i})" style="cursor:pointer; margin-left:5px;">&times;</span>
                 </div>
             `).join('');
+        }
+
+        function updateEntryCategory(entryId, category) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (!entry) return;
+
+            if (category === 'custom') {
+                return; // Do nothing, let user edit manually
             }
 
-            function updateEntryCategory(entryId, category) {
-                const entry = soundEntries.find(e => e.id === entryId);
-                if (!entry) return;
+            // Replace current "folder" in path
+            // Assuming format /aircraft/FOLDER/name or /aircraft/name
 
-                if (category === 'custom') {
-                    return; // Do nothing, let user edit manually
+            let parts = entry.eventName.split('/');
+            // Standard path: ["", "aircraft", "generic", "name"] -> length 4
+
+            if (category === 'generic') {
+                // Reset to generic if possible, or just replace current category section
+                if (parts.length >= 4) {
+                    parts[2] = 'generic';
+                    const newName = parts.join('/');
+                    updateEntryField(entryId, 'eventName', newName);
+                    // Also update the input field visually
+                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+                    if (input) input.value = newName;
                 }
-
-                // Replace current "folder" in path
-                // Assuming format /aircraft/FOLDER/name or /aircraft/name
-
-                let parts = entry.eventName.split('/');
-                // Standard path: ["", "aircraft", "generic", "name"] -> length 4
-
-                if (category === 'generic') {
-                    // Reset to generic if possible, or just replace current category section
-                    if (parts.length >= 4) {
-                        parts[2] = 'generic';
-                        const newName = parts.join('/');
-                        updateEntryField(entryId, 'eventName', newName);
-                        // Also update the input field visually
-                        const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
-                        if (input) input.value = newName;
-                    }
-                } else {
-                    if (parts.length >= 4) {
-                        parts[2] = category;
-                        const newName = parts.join('/');
-                        updateEntryField(entryId, 'eventName', newName);
-                        // Also update the input field visually
-                        const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
-                        if (input) input.value = newName;
-                    }
+            } else {
+                if (parts.length >= 4) {
+                    parts[2] = category;
+                    const newName = parts.join('/');
+                    updateEntryField(entryId, 'eventName', newName);
+                    // Also update the input field visually
+                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+                    if (input) input.value = newName;
                 }
             }
+        }
 
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // OBJ Parser (same as before)
+
+        // COMPARE MODAL FUNCTIONS (NEW)
+
+
+        function openCompareModal(diffs, totalEntries, matched, unmatched) {
+            currentDiffs = diffs;
+            document.getElementById('compareTotalChanges').textContent = diffs.length;
+            document.getElementById('compareSelectedCount').textContent = diffs.length;
+            document.getElementById('compareSelectAll').checked = true;
+
+            // Store stats for later
+            currentDiffs.stats = { totalEntries, matched, unmatched };
+
+            renderCompareTable();
+            document.getElementById('compareModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCompareModal() {
+            document.getElementById('compareModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.getElementById('updateBtn').disabled = false;
+        }
+
+        function renderCompareTable() {
+            const tbody = document.getElementById('compareBody');
+            tbody.innerHTML = '';
+
+            if (currentDiffs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No changes found.</td></tr>';
+                return;
             }
 
-            // OBJ Parser (same as before)
+            currentDiffs.forEach(diff => {
+                const tr = document.createElement('tr');
+                tr.className = `compare-row ${diff.selected ? '' : 'deselected'}`;
 
-            // COMPARE MODAL FUNCTIONS (NEW)
-
-
-            function openCompareModal(diffs, totalEntries, matched, unmatched) {
-                currentDiffs = diffs;
-                document.getElementById('compareTotalChanges').textContent = diffs.length;
-                document.getElementById('compareSelectedCount').textContent = diffs.length;
-                document.getElementById('compareSelectAll').checked = true;
-
-                // Store stats for later
-                currentDiffs.stats = { totalEntries, matched, unmatched };
-
-                renderCompareTable();
-                document.getElementById('compareModal').classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-
-            function closeCompareModal() {
-                document.getElementById('compareModal').classList.remove('active');
-                document.body.style.overflow = 'auto';
-                document.getElementById('updateBtn').disabled = false;
-            }
-
-            function renderCompareTable() {
-                const tbody = document.getElementById('compareBody');
-                tbody.innerHTML = '';
-
-                if (currentDiffs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No changes found.</td></tr>';
-                    return;
-                }
-
-                currentDiffs.forEach(diff => {
-                    const tr = document.createElement('tr');
-                    tr.className = `compare-row ${diff.selected ? '' : 'deselected'}`;
-
-                    tr.innerHTML = `
+                tr.innerHTML = `
                     <td>
                         <input type="checkbox" ${diff.selected ? 'checked' : ''} 
                                onchange="toggleDiff(${diff.id}, this.checked)">
@@ -3781,284 +3774,296 @@ documentation or community forums.
                         </div>
                     </td>
                 `;
-                    tbody.appendChild(tr);
-                });
-            }
+                tbody.appendChild(tr);
+            });
+        }
 
-            function toggleDiff(id, checked) {
-                const diff = currentDiffs.find(d => d.id === id);
-                if (diff) {
-                    diff.selected = checked;
-                    renderCompareTable(); // Re-render to update opacity
-                    updateCompareCounts();
-                }
-            }
-
-            function toggleAllCompare(checked) {
-                currentDiffs.forEach(diff => diff.selected = checked);
-                renderCompareTable();
+        function toggleDiff(id, checked) {
+            const diff = currentDiffs.find(d => d.id === id);
+            if (diff) {
+                diff.selected = checked;
+                renderCompareTable(); // Re-render to update opacity
                 updateCompareCounts();
             }
+        }
 
-            function updateCompareCounts() {
-                const selected = currentDiffs.filter(d => d.selected).length;
-                document.getElementById('compareSelectedCount').textContent = selected;
+        function toggleAllCompare(checked) {
+            currentDiffs.forEach(diff => diff.selected = checked);
+            renderCompareTable();
+            updateCompareCounts();
+        }
+
+        function updateCompareCounts() {
+            const selected = currentDiffs.filter(d => d.selected).length;
+            document.getElementById('compareSelectedCount').textContent = selected;
+        }
+
+        function applyUpdates() {
+            const selectedChanges = currentDiffs.filter(d => d.selected);
+            const stats = currentDiffs.stats;
+
+            // Apply changes to the original content
+            // Need to recreate the updater to access content easily, or just use the global
+            const updater = new SNDUpdater(sndFileContent);
+            const lines = [...updater.originalLines];
+
+            selectedChanges.forEach(diff => {
+                const tabs = diff.oldLine.match(/^\t*/)[0];
+                lines[diff.lineIndex] = `${tabs}VEH_XYZ ${diff.newXYZ[0].toFixed(3)} ${diff.newXYZ[1].toFixed(3)} ${diff.newXYZ[2].toFixed(3)}`;
+            });
+
+            const updatedContent = lines.join('\n');
+            const updatedCount = selectedChanges.length;
+
+            closeCompareModal();
+
+            // Finish the workflow (Update UI with results)
+            log('Update complete!', 'success', 'consoleUpdate');
+            log(`Updated ${updatedCount} coordinates`, 'success', 'consoleUpdate');
+
+            if (stats.unmatched.length > 0) {
+                log(`Warning: ${stats.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
+                log('Unmatched commands:', 'warning', 'consoleUpdate');
+                stats.unmatched.slice(0, 5).forEach(cmd => {
+                    log(`  - ${cmd}`, 'warning', 'consoleUpdate');
+                });
+                if (stats.unmatched.length > 5) {
+                    log(`  ... and ${stats.unmatched.length - 5} more`, 'warning', 'consoleUpdate');
+                }
             }
 
-            function applyUpdates() {
-                const selectedChanges = currentDiffs.filter(d => d.selected);
-                const stats = currentDiffs.stats;
+            // Update stats grid
+            document.getElementById('statEntriesFound').textContent = stats.totalEntries.toLocaleString();
+            document.getElementById('statMatched').textContent = stats.matched.toLocaleString();
+            document.getElementById('statUpdated').textContent = updatedCount.toLocaleString();
+            document.getElementById('statUnmatched').textContent = stats.unmatched.length.toLocaleString();
+            document.getElementById('statsGridUpdate').classList.remove('hidden');
 
-                // Apply changes to the original content
-                // Need to recreate the updater to access content easily, or just use the global
-                const updater = new SNDUpdater(sndFileContent);
-                const lines = [...updater.originalLines];
+            // Show download button
+            const downloadBtn = document.getElementById('downloadBtnUpdate');
+            downloadBtn.classList.remove('hidden');
+            const outputFilename = document.getElementById('outputNameUpdate').value || 'updated.snd';
+            downloadBtn.onclick = () => downloadFile(updatedContent, outputFilename);
 
-                selectedChanges.forEach(diff => {
-                    const tabs = diff.oldLine.match(/^\t*/)[0];
-                    lines[diff.lineIndex] = `${tabs}VEH_XYZ ${diff.newXYZ[0].toFixed(3)} ${diff.newXYZ[1].toFixed(3)} ${diff.newXYZ[2].toFixed(3)}`;
-                });
+            // Hide progress
+            const progressBar = document.getElementById('progressBarUpdate');
+            const progressFill = document.getElementById('progressFillUpdate');
+            setTimeout(() => {
+                progressBar.classList.add('hidden');
+                progressFill.style.width = '0';
+            }, 500);
+        }
 
-                const updatedContent = lines.join('\n');
-                const updatedCount = selectedChanges.length;
+        // FMOD PACKAGE EXPORT FUNCTION
+        async function exportFMODPackage() {
+            if (!sndFileFmodContent) {
+                alert('Please upload a .snd file!');
+                return;
+            }
 
-                closeCompareModal();
+            const startTime = performance.now();
 
-                // Finish the workflow (Update UI with results)
-                log('Update complete!', 'success', 'consoleUpdate');
-                log(`Updated ${updatedCount} coordinates`, 'success', 'consoleUpdate');
+            document.getElementById('outputSectionFmod').classList.remove('hidden');
+            clearConsole('consoleFmod');
+            document.getElementById('statsGridFmod').classList.add('hidden');
+            document.getElementById('downloadBtnFmod').classList.add('hidden');
 
-                if (stats.unmatched.length > 0) {
-                    log(`Warning: ${stats.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
-                    log('Unmatched commands:', 'warning', 'consoleUpdate');
-                    stats.unmatched.slice(0, 5).forEach(cmd => {
-                        log(`  - ${cmd}`, 'warning', 'consoleUpdate');
-                    });
-                    if (stats.unmatched.length > 5) {
-                        log(`  ... and ${stats.unmatched.length - 5} more`, 'warning', 'consoleUpdate');
-                    }
+            const progressBar = document.getElementById('progressBarFmod');
+            const progressFill = document.getElementById('progressFillFmod');
+            progressBar.classList.remove('hidden');
+            progressFill.style.width = '10%';
+
+            document.getElementById('fmodExportBtn').disabled = true;
+
+            log('Starting FMOD package generation...', 'info', 'consoleFmod');
+
+            try {
+                // Load JSZip dynamically
+                if (typeof JSZip === 'undefined') {
+                    log('Loading JSZip library...', 'info', 'consoleFmod');
+                    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+                    progressFill.style.width = '20%';
                 }
 
-                // Update stats grid
-                document.getElementById('statEntriesFound').textContent = stats.totalEntries.toLocaleString();
-                document.getElementById('statMatched').textContent = stats.matched.toLocaleString();
-                document.getElementById('statUpdated').textContent = updatedCount.toLocaleString();
-                document.getElementById('statUnmatched').textContent = stats.unmatched.length.toLocaleString();
-                document.getElementById('statsGridUpdate').classList.remove('hidden');
+                const packageName = document.getElementById('packageName').value || 'aircraft_sounds';
+                const createPlaceholders = document.getElementById('createPlaceholders').checked;
+                const includeReadme = document.getElementById('includeReadme').checked;
+
+                progressFill.style.width = '30%';
+
+                // Parse SND file for event names
+                const parser = new SNDEventParser(sndFileFmodContent);
+                const events = parser.extractEvents();
+
+                log(`Found ${events.length} unique event paths`, 'success', 'consoleFmod');
+                progressFill.style.width = '50%';
+
+                // Build FMOD package
+                const builder = new FMODPackageBuilder(packageName, createPlaceholders, includeReadme);
+                fmodPackageBlob = await builder.build(events);
+
+                progressFill.style.width = '100%';
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                log('Package generation complete!', 'success', 'consoleFmod');
+                log(`Created ${builder.stats.folders} folders and ${builder.stats.files} files`, 'info', 'consoleFmod');
+
+                // Update stats
+                document.getElementById('statEventsFound').textContent = events.length.toLocaleString();
+                document.getElementById('statFolders').textContent = builder.stats.folders.toLocaleString();
+                document.getElementById('statFiles').textContent = builder.stats.files.toLocaleString();
+                document.getElementById('statPackageSize').textContent = (fmodPackageBlob.size / 1024).toFixed(1) + ' KB';
+                document.getElementById('statTimeFmod').textContent = processingTime + 'ms';
+                document.getElementById('statsGridFmod').classList.remove('hidden');
 
                 // Show download button
-                const downloadBtn = document.getElementById('downloadBtnUpdate');
+                const downloadBtn = document.getElementById('downloadBtnFmod');
                 downloadBtn.classList.remove('hidden');
-                const outputFilename = document.getElementById('outputNameUpdate').value || 'updated.snd';
-                downloadBtn.onclick = () => downloadFile(updatedContent, outputFilename);
+                downloadBtn.onclick = () => {
+                    const url = URL.createObjectURL(fmodPackageBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${packageName}_fmod_structure.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    log(`Downloaded: ${packageName}_fmod_structure.zip`, 'success', 'consoleFmod');
+                };
 
-                // Hide progress
-                const progressBar = document.getElementById('progressBarUpdate');
-                const progressFill = document.getElementById('progressFillUpdate');
                 setTimeout(() => {
                     progressBar.classList.add('hidden');
                     progressFill.style.width = '0';
                 }, 500);
+
+            } catch (error) {
+                log('ERROR: ' + error.message, 'error', 'consoleFmod');
+                console.error(error);
+                progressFill.style.width = '0';
+                setTimeout(() => progressBar.classList.add('hidden'), 500);
             }
 
-            // FMOD PACKAGE EXPORT FUNCTION
-            async function exportFMODPackage() {
-                if (!sndFileFmodContent) {
-                    alert('Please upload a .snd file!');
-                    return;
+            document.getElementById('fmodExportBtn').disabled = false;
+        }
+
+        // Helper to load external scripts
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Helper to parse .snd content back into SoundEntry objects
+        function parseSNDToEntries(content) {
+            const entries = [];
+            const lines = content.split('\n');
+            let currentEntry = null;
+            let currentComment = '';
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+
+                if (!line) continue;
+
+                if (line.startsWith('#')) {
+                    currentComment = line.substring(1).trim();
+                    continue;
                 }
 
-                const startTime = performance.now();
-
-                document.getElementById('outputSectionFmod').classList.remove('hidden');
-                clearConsole('consoleFmod');
-                document.getElementById('statsGridFmod').classList.add('hidden');
-                document.getElementById('downloadBtnFmod').classList.add('hidden');
-
-                const progressBar = document.getElementById('progressBarFmod');
-                const progressFill = document.getElementById('progressFillFmod');
-                progressBar.classList.remove('hidden');
-                progressFill.style.width = '10%';
-
-                document.getElementById('fmodExportBtn').disabled = true;
-
-                log('Starting FMOD package generation...', 'info', 'consoleFmod');
-
-                try {
-                    // Load JSZip dynamically
-                    if (typeof JSZip === 'undefined') {
-                        log('Loading JSZip library...', 'info', 'consoleFmod');
-                        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-                        progressFill.style.width = '20%';
-                    }
-
-                    const packageName = document.getElementById('packageName').value || 'aircraft_sounds';
-                    const createPlaceholders = document.getElementById('createPlaceholders').checked;
-                    const includeReadme = document.getElementById('includeReadme').checked;
-
-                    progressFill.style.width = '30%';
-
-                    // Parse SND file for event names
-                    const parser = new SNDEventParser(sndFileFmodContent);
-                    const events = parser.extractEvents();
-
-                    log(`Found ${events.length} unique event paths`, 'success', 'consoleFmod');
-                    progressFill.style.width = '50%';
-
-                    // Build FMOD package
-                    const builder = new FMODPackageBuilder(packageName, createPlaceholders, includeReadme);
-                    fmodPackageBlob = await builder.build(events);
-
-                    progressFill.style.width = '100%';
-
-                    const endTime = performance.now();
-                    const processingTime = Math.round(endTime - startTime);
-
-                    log('Package generation complete!', 'success', 'consoleFmod');
-                    log(`Created ${builder.stats.folders} folders and ${builder.stats.files} files`, 'info', 'consoleFmod');
-
-                    // Update stats
-                    document.getElementById('statEventsFound').textContent = events.length.toLocaleString();
-                    document.getElementById('statFolders').textContent = builder.stats.folders.toLocaleString();
-                    document.getElementById('statFiles').textContent = builder.stats.files.toLocaleString();
-                    document.getElementById('statPackageSize').textContent = (fmodPackageBlob.size / 1024).toFixed(1) + ' KB';
-                    document.getElementById('statTimeFmod').textContent = processingTime + 'ms';
-                    document.getElementById('statsGridFmod').classList.remove('hidden');
-
-                    // Show download button
-                    const downloadBtn = document.getElementById('downloadBtnFmod');
-                    downloadBtn.classList.remove('hidden');
-                    downloadBtn.onclick = () => {
-                        const url = URL.createObjectURL(fmodPackageBlob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${packageName}_fmod_structure.zip`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        log(`Downloaded: ${packageName}_fmod_structure.zip`, 'success', 'consoleFmod');
-                    };
-
-                    setTimeout(() => {
-                        progressBar.classList.add('hidden');
-                        progressFill.style.width = '0';
-                    }, 500);
-
-                } catch (error) {
-                    log('ERROR: ' + error.message, 'error', 'consoleFmod');
-                    console.error(error);
-                    progressFill.style.width = '0';
-                    setTimeout(() => progressBar.classList.add('hidden'), 500);
+                if (line.startsWith('BEGIN_SOUND_ATTACHMENT')) {
+                    currentEntry = new SoundEntry({});
+                    currentEntry.comment = currentComment;
+                    currentComment = '';
+                    continue;
                 }
 
-                document.getElementById('fmodExportBtn').disabled = false;
-            }
-
-            // Helper to load external scripts
-            function loadScript(src) {
-                return new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = src;
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            }
-
-            // Helper to parse .snd content back into SoundEntry objects
-            function parseSNDToEntries(content) {
-                const entries = [];
-                const lines = content.split('\n');
-                let currentEntry = null;
-                let currentComment = '';
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-
-                    if (!line) continue;
-
-                    if (line.startsWith('#')) {
-                        currentComment = line.substring(1).trim();
-                        continue;
-                    }
-
-                    if (line.startsWith('BEGIN_SOUND_ATTACHMENT')) {
-                        currentEntry = new SoundEntry({});
-                        currentEntry.comment = currentComment;
-                        currentComment = '';
-                        continue;
-                    }
-
-                    if (line.startsWith('END_SOUND_ATTACHMENT')) {
-                        if (currentEntry) {
-                            entries.push(currentEntry);
-                            currentEntry = null;
-                        }
-                        continue;
-                    }
-
+                if (line.startsWith('END_SOUND_ATTACHMENT')) {
                     if (currentEntry) {
-                        const parts = line.split(/\s+/);
-                        const key = parts[0];
-                        const args = parts.slice(1);
-                        const value = args.join(' ');
+                        entries.push(currentEntry);
+                        currentEntry = null;
+                    }
+                    continue;
+                }
 
-                        switch (key) {
-                            case 'EVENT_NAME':
-                                currentEntry.eventName = value;
-                                break;
-                            case 'VEH_XYZ':
-                                currentEntry.xyz = [parseFloat(args[0]), parseFloat(args[1]), parseFloat(args[2])];
-                                break;
-                            case 'VEH_PART':
-                                currentEntry.vehPart = value;
-                                break;
-                            case 'EVENT_CMND_DOWN':
-                                currentEntry.triggerType = 'EVENT_CMND_DOWN';
-                                currentEntry.command = value;
-                                break;
-                            case 'EVENT_CMND_UP':
-                                currentEntry.triggerType = 'EVENT_CMND_UP';
-                                currentEntry.command = value;
-                                break;
-                            case 'EVENT_CMND_HOLD_STOP':
-                                currentEntry.triggerType = 'EVENT_CMND_HOLD_STOP';
-                                currentEntry.command = value;
-                                break;
-                            case 'EVENT_CMND_HOLD_CUE':
-                                currentEntry.triggerType = 'EVENT_CMND_HOLD_CUE';
-                                currentEntry.command = value;
-                                break;
-                            case 'EVENT_START_COND':
-                                currentEntry.triggerType = 'EVENT_START_COND';
-                                currentEntry.startCond = value;
-                                break;
-                            case 'EVENT_END_COND':
-                                currentEntry.endCond = value;
-                                break;
-                            case 'EVENT_AUTO_END_FROM_START_COND':
-                                currentEntry.autoEndCond = value;
-                                break;
-                            case 'CUE_TRIGGER_COND':
-                                currentEntry.triggerType = 'CUE_TRIGGER_COND';
-                                currentEntry.cueTrigger = value;
-                                break;
-                            case 'EVENT_POLYPHONIC':
-                                currentEntry.polyphonic = true;
-                                break;
-                            case 'EVENT_ALLOWED_FOR_AI':
-                                currentEntry.allowedForAI = true;
-                                break;
-                            case 'PARAM_DREF_IDX':
-                                currentEntry.paramDrefIdx = parseInt(value);
-                                break;
-                        }
+                if (currentEntry) {
+                    const parts = line.split(/\s+/);
+                    const key = parts[0];
+                    const args = parts.slice(1);
+                    const value = args.join(' ');
+
+                    switch (key) {
+                        case 'EVENT_NAME':
+                            currentEntry.eventName = value;
+                            break;
+                        case 'VEH_XYZ':
+                            currentEntry.xyz = [parseFloat(args[0]), parseFloat(args[1]), parseFloat(args[2])];
+                            break;
+                        case 'VEH_PART':
+                            currentEntry.vehPart = value;
+                            break;
+                        case 'EVENT_CMND_DOWN':
+                            currentEntry.triggerType = 'EVENT_CMND_DOWN';
+                            currentEntry.command = value;
+                            break;
+                        case 'EVENT_CMND_UP':
+                            currentEntry.triggerType = 'EVENT_CMND_UP';
+                            currentEntry.command = value;
+                            break;
+                        case 'EVENT_CMND_HOLD_STOP':
+                            currentEntry.triggerType = 'EVENT_CMND_HOLD_STOP';
+                            currentEntry.command = value;
+                            break;
+                        case 'EVENT_CMND_HOLD_CUE':
+                            currentEntry.triggerType = 'EVENT_CMND_HOLD_CUE';
+                            currentEntry.command = value;
+                            break;
+                        case 'EVENT_START_COND':
+                            currentEntry.triggerType = 'EVENT_START_COND';
+                            currentEntry.startCond = value;
+                            break;
+                        case 'EVENT_END_COND':
+                            currentEntry.endCond = value;
+                            break;
+                        case 'EVENT_AUTO_END_FROM_START_COND':
+                            currentEntry.autoEndCond = value;
+                            break;
+                        case 'CUE_TRIGGER_COND':
+                            currentEntry.triggerType = 'CUE_TRIGGER_COND';
+                            currentEntry.cueTrigger = value;
+                            break;
+                        case 'EVENT_POLYPHONIC':
+                            currentEntry.polyphonic = true;
+                            break;
+                        case 'EVENT_ALLOWED_FOR_AI':
+                            currentEntry.allowedForAI = true;
+                            break;
+                        case 'PARAM_DREF_IDX':
+                            currentEntry.paramDrefIdx = parseInt(value);
+                            break;
                     }
                 }
-                return entries;
             }
+            return entries;
+        }
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('X-FMOD Initializing...');
+
+            // Initialize default category
+            userCategories = ['switches', 'knobs', 'buttons', 'warnings'];
+            if (typeof renderCategories === 'function') renderCategories();
+
+            log('Ready. Select a mode to begin.', 'info');
+        });
+
     </script>
 </body>
 
 </html>
+```
