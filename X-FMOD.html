@@ -728,7 +728,6 @@
 
         .compare-row.deselected td {
             opacity: 0.5;
-            text-decoration: line-through;
         }
 
         .compare-row.deselected td input {
@@ -737,7 +736,6 @@
 
         .diff-old {
             color: #bf616a;
-            text-decoration: line-through;
             margin-right: 0.5rem;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
@@ -1166,7 +1164,6 @@
 
         .diff-old {
             color: var(--error);
-            text-decoration: line-through;
             font-size: 0.8em;
             display: block;
         }
@@ -3367,9 +3364,8 @@ documentation or community forums.
                 return;
             }
 
-            // Show first 100 changes to prevent lag if there are thousands
-            const limit = 100;
-            const diffsToShow = currentDiffs.slice(0, limit);
+            // Show all changes
+            const diffsToShow = currentDiffs;
 
             diffsToShow.forEach(diff => {
                 const tr = document.createElement('tr');
@@ -3402,14 +3398,6 @@ documentation or community forums.
                 `;
                 tbody.appendChild(tr);
             });
-
-            if (currentDiffs.length > limit) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="3" style="text-align: center; color: var(--text-muted);">
-                    ... and ${currentDiffs.length - limit} more changes (hidden for performance)
-                </td>`;
-                tbody.appendChild(tr);
-            }
         }
 
         function toggleDiff(id, checked) {
