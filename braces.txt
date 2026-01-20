@@ -1,0 +1,200 @@
+3298:        function closeReviewModal() {
+3301:        }
+3303:        function renderReviewModal() {
+3309:            filtered.forEach((entry, index) => {
+3312:            });
+3315:        }
+3317:        function getFilteredEntries() {
+3321:            if (searchText) {
+3329:            }
+3332:            switch (currentFilter) {
+3346:            }
+3347:        }
+3349:        function updateSearch(val) {
+3352:        }
+3354:        function toggleEntryComplete(entryId, completed) {
+3356:            if (entry) {
+3359:            }
+3360:        }
+3362:        function toggleEntrySelected(entryId, selected) {
+3364:            if (entry) {
+3367:            }
+3368:        }
+3370:        function updateBulkActionsUI() {
+3375:            if (selectedCount > 0) {
+3382:                                     ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}`;
+3383:            } else {
+3385:            }
+3386:        }
+3388:        function applyBulkUpdate() {
+3395:            selectedEntries.forEach(entry => {
+3396:                if (category) {
+3398:                }
+3399:                if (trigger) {
+3401:                }
+3402:            });
+3404:            log(`Bulk updated ${selectedEntries.length} entries`, 'success');
+3406:        }
+3408:        function updateReviewStats() {
+3428:        }
+3430:        function createEntryCard(entry) {
+3435:            card.className = `sound-entry ${entry.deleted ? 'deleted' : ''} ${isCompleted ? 'completed' : ''}`;
+3436:            card.id = `entry-${entry.id}`;
+3438:            if (entry.deleted) {
+3441:                        <div class="entry-title" style="text-decoration: line-through; opacity: 0.6;">${escapeHtml(entry.comment || entry.eventName)}</div>
+3443:                            <button class="entry-btn restore" onclick="restoreEntry('${entry.id}'); event.stopPropagation();">Restore</button>
+3451:            }
+3457:                               ${isSelected ? 'checked' : ''} 
+3458:                               onchange="toggleEntrySelected('${entry.id}', this.checked)">
+3459:                        <div class="entry-title">${escapeHtml(entry.comment || entry.eventName)}</div>
+3463:                            <input type="checkbox" ${isCompleted ? 'checked' : ''} 
+3464:                                   onchange="toggleEntryComplete('${entry.id}', this.checked)">
+3467:                        <button class="entry-btn delete" onclick="deleteEntry('${entry.id}')">Delete</button>
+3474:                        <select class="entry-select" onchange="updateEntryCategory('${entry.id}', this.value)">
+3476:                            ${userCategories.map(c => `<option value="${c}" ${c === getCategoryFromEvent(entry.eventName) ? 'selected' : ''}>${c}</option>`).join('')}
+3483:                        <input type="text" class="entry-input" data-field="eventName" value="${escapeHtml(entry.eventName)}" 
+3484:                               onchange="updateEntryField('${entry.id}', 'eventName', this.value)">
+3489:                        <select class="entry-select" onchange="updateEntryField('${entry.id}', 'triggerType', this.value); renderReviewModal();">
+3490:                            <option value="EVENT_START_COND" ${entry.triggerType === 'EVENT_START_COND' ? 'selected' : ''}>Start/End Condition</option>
+3491:                            <option value="EVENT_CMND_DOWN" ${entry.triggerType === 'EVENT_CMND_DOWN' ? 'selected' : ''}>Command Pressed</option>
+3492:                            <option value="EVENT_CMND_UP" ${entry.triggerType === 'EVENT_CMND_UP' ? 'selected' : ''}>Command Released</option>
+3493:                            <option value="EVENT_CMND_HOLD_STOP" ${entry.triggerType === 'EVENT_CMND_HOLD_STOP' ? 'selected' : ''}>Hold to Play</option>
+3494:                            <option value="EVENT_CMND_HOLD_CUE" ${entry.triggerType === 'EVENT_CMND_HOLD_CUE' ? 'selected' : ''}>Press & Release Cue</option>
+3495:                            <option value="CUE_TRIGGER_COND" ${entry.triggerType === 'CUE_TRIGGER_COND' ? 'selected' : ''}>Cue Trigger</option>
+3499:                    ${getTriggerFields(entry)}
+3503:                        <input type="text" class="entry-input" value="${escapeHtml(entry.autoEndCond)}" 
+3504:                               onchange="updateEntryField('${entry.id}', 'autoEndCond', this.value)"
+3510:                        <input type="text" class="entry-input" value="${entry.xyz.map(v => v.toFixed(3)).join(', ')}" readonly style="opacity: 0.6;">
+3517:                                <input type="checkbox" id="poly-${entry.id}" ${entry.polyphonic ? 'checked' : ''}
+3518:                                       onchange="updateEntryField('${entry.id}', 'polyphonic', this.checked)">
+3519:                                <label for="poly-${entry.id}">Polyphonic</label>
+3522:                                <input type="checkbox" id="ai-${entry.id}" ${entry.allowedForAI ? 'checked' : ''}
+3523:                                       onchange="updateEntryField('${entry.id}', 'allowedForAI', this.checked)">
+3524:                                <label for="ai-${entry.id}">Allowed for AI</label>
+3532:        }
+3535:        function getCategoryFromEvent(eventName) {
+3539:        }
+3541:        function getTriggerFields(entry) {
+3542:            switch (entry.triggerType) {
+3547:                            <input type="text" class="entry-input" value="${escapeHtml(entry.startCond)}" 
+3548:                                   onchange="updateEntryField('${entry.id}', 'startCond', this.value)"
+3553:                            <input type="text" class="entry-input" value="${escapeHtml(entry.endCond)}" 
+3554:                                   onchange="updateEntryField('${entry.id}', 'endCond', this.value)"
+3565:                            <input type="text" class="entry-input" value="${escapeHtml(entry.command)}" 
+3566:                                   onchange="updateEntryField('${entry.id}', 'command', this.value)"
+3574:                            <input type="text" class="entry-input" value="${escapeHtml(entry.cueTrigger)}" 
+3575:                                   onchange="updateEntryField('${entry.id}', 'cueTrigger', this.value)"
+3581:            }
+3582:        }
+3584:        function updateEntryField(entryId, field, value) {
+3586:            if (entry) {
+3589:            }
+3590:        }
+3592:        function deleteEntry(entryId) {
+3594:            if (entry) {
+3597:            }
+3598:        }
+3600:        function restoreEntry(entryId) {
+3602:            if (entry) {
+3605:            }
+3606:        }
+3608:        function filterEntries(filter) {
+3615:        }
+3617:        function updateReviewStats() {
+3631:        }
+3633:        function downloadReviewedSND() {
+3639:                .forEach(entry => {
+3641:                });
+3646:            log(`Downloaded customized .snd file with ${soundEntries.filter(e => !e.deleted).length} entries`, 'success');
+3647:        }
+3650:        function addCategory() {
+3654:            if (category && !userCategories.includes(category)) {
+3658:            } else if (userCategories.includes(category)) {
+3660:            }
+3661:        }
+3663:        function removeCategory(index) {
+3666:        }
+3668:        function renderCategories() {
+3674:                    ${cat}
+3675:                    <span onclick="removeCategory(${i})" style="cursor:pointer; margin-left:5px;">&times;</span>
+3678:        }
+3680:        function updateEntryCategory(entryId, category) {
+3684:            if (category === 'custom') {
+3686:            }
+3694:            if (category === 'generic') {
+3696:                if (parts.length >= 4) {
+3701:                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+3703:                }
+3704:            } else {
+3705:                if (parts.length >= 4) {
+3710:                    const input = document.querySelector(`#entry-${entryId} input[data-field="eventName"]`);
+3712:                }
+3713:            }
+3714:        }
+3716:        function escapeHtml(text) {
+3720:        }
+3727:        function openCompareModal(diffs, totalEntries, matched, unmatched) {
+3734:            currentDiffs.stats = { totalEntries, matched, unmatched };
+3739:        }
+3741:        function closeCompareModal() {
+3745:        }
+3747:        function renderCompareTable() {
+3751:            if (currentDiffs.length === 0) {
+3754:            }
+3756:            currentDiffs.forEach(diff => {
+3758:                tr.className = `compare-row ${diff.selected ? '' : 'deselected'}`;
+3762:                        <input type="checkbox" ${diff.selected ? 'checked' : ''} 
+3763:                               onchange="toggleDiff(${diff.id}, this.checked)">
+3766:                        <div style="font-weight: 600; color: var(--accent); margin-bottom: 2px;">${escapeHtml(diff.eventName)}</div>
+3767:                        <div style="font-size: 0.8rem; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px; display: inline-block;">${escapeHtml(diff.command)}</div>
+3768:                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Line ${diff.lineIndex + 1}</div>
+3774:                                ${diff.oldXYZ[0].toFixed(3)}, ${diff.oldXYZ[1].toFixed(3)}, ${diff.oldXYZ[2].toFixed(3)}
+3780:                                ${diff.newXYZ[0].toFixed(3)}, ${diff.newXYZ[1].toFixed(3)}, ${diff.newXYZ[2].toFixed(3)}
+3786:            });
+3787:        }
+3789:        function toggleDiff(id, checked) {
+3791:            if (diff) {
+3795:            }
+3796:        }
+3798:        function toggleAllCompare(checked) {
+3802:        }
+3804:        function updateCompareCounts() {
+3807:        }
+3809:        function applyUpdates() {
+3818:            selectedChanges.forEach(diff => {
+3820:                lines[diff.lineIndex] = `${tabs}VEH_XYZ ${diff.newXYZ[0].toFixed(3)} ${diff.newXYZ[1].toFixed(3)} ${diff.newXYZ[2].toFixed(3)}`;
+3821:            });
+3830:            log(`Updated ${updatedCount} coordinates`, 'success', 'consoleUpdate');
+3832:            if (stats.unmatched.length > 0) {
+3833:                log(`Warning: ${stats.unmatched.length} commands not found in OBJ`, 'warning', 'consoleUpdate');
+3835:                stats.unmatched.slice(0, 5).forEach(cmd => {
+3836:                    log(`  - ${cmd}`, 'warning', 'consoleUpdate');
+3837:                });
+3838:                if (stats.unmatched.length > 5) {
+3839:                    log(`  ... and ${stats.unmatched.length - 5} more`, 'warning', 'consoleUpdate');
+3840:                }
+3841:            }
+3859:            setTimeout(() => {
+3862:            }, 500);
+3863:        }
+3866:        async function exportFMODPackage() {
+3867:            if (!sndFileFmodContent) {
+3870:            }
+3888:            try {
+3890:                if (typeof JSZip === 'undefined') {
+3894:                }
+3906:                log(`Found ${events.length} unique event paths`, 'success', 'consoleFmod');
+3919:                log(`Created ${builder.stats.folders} folders and ${builder.stats.files} files`, 'info', 'consoleFmod');
+3932:                downloadBtn.onclick = () => {
+3936:                    a.download = `${packageName}_fmod_structure.zip`;
+3941:                    log(`Downloaded: ${packageName}_fmod_structure.zip`, 'success', 'consoleFmod');
+3942:                };
+3944:                setTimeout(() => {
+3947:                }, 500);
+3949:            } catch (error) {
+3954:            }
+3957:        }
+3960:        function loadScript(src) {
+3961:            return new Promise((resolve, reject) => {
+3967:            });
+3968:        }
