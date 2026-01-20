@@ -3154,16 +3154,26 @@ documentation or community forums.
                 downloadBtn.classList.remove('hidden');
                 downloadBtn.textContent = 'Review & Customize';
 
-                // Remove any existing listeners by cloning (optional but safe)
-                const newBtn = downloadBtn.cloneNode(true);
-                downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                // Use a direct onclick for reliability + logging
+                downloadBtn.onclick = function (e) {
+                    e.preventDefault();
+                    console.log('Button clicked (onclick)! Output:', outputFilename);
+                    console.log('Sound Entries count:', soundEntries ? soundEntries.length : 'null');
 
-                newBtn.onclick = function () {
-                    console.log('Button clicked! Opening modal for:', outputFilename);
-                    openReviewModal(outputFilename);
+                    if (!soundEntries || soundEntries.length === 0) {
+                        alert('No sound entries generated! Please check the console for parsing errors.');
+                        return;
+                    }
+
+                    try {
+                        openReviewModal(outputFilename);
+                    } catch (err) {
+                        console.error('CRITICAL: Failed to open modal:', err);
+                        alert('Failed to open modal: ' + err.message);
+                    }
                 };
 
-                log(`Button enabled for output: ${outputFilename}`, 'info');
+                log(`Button ready. Entries generated: ${soundEntries.length}`, 'info');
 
                 log(`Generated ${totalEntries} total sound entries - Click "Review & Customize" to edit`, 'info');
 
