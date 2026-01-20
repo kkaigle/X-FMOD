@@ -443,6 +443,65 @@
             }
         }
 
+        /* ... existing styles ... */
+
+        .sound-entry.completed {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .sound-entry.completed .entry-header {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .bulk-actions {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.6rem 0.8rem 0.6rem 2.2rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .entry-select-checkbox {
+            width: 18px;
+            height: 18px;
+            margin-right: 1rem;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+
         .console-line.success {
             color: #a3be8c;
         }
@@ -1892,15 +1951,51 @@
                     <h2>Review & Customize Sound Configuration</h2>
                     <p>Edit event names, triggers, and conditions. Delete unwanted entries. Click on any field to
                         customize.</p>
-                    <div class="review-filters">
-                        <button class="filter-btn active" onclick="filterEntries('all')">All (<span
-                                id="countAll">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('template')">Templates (<span
-                                id="countTemplate">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('manip')">Manipulators (<span
-                                id="countManip">0</span>)</button>
-                        <button class="filter-btn" onclick="filterEntries('deleted')">Deleted (<span
-                                id="countDeleted">0</span>)</button>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <div class="search-box">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" class="search-input" placeholder="Search events..."
+                                oninput="updateSearch(this.value)">
+                        </div>
+                        <div class="review-filters">
+                            <button class="filter-btn active" onclick="filterEntries('all')">All (<span
+                                    id="countAll">0</span>)</button>
+                            <button class="filter-btn" onclick="filterEntries('pending')">Pending (<span
+                                    id="countPending">0</span>)</button>
+                            <button class="filter-btn" onclick="filterEntries('completed')">Complete (<span
+                                    id="countCompleted">0</span>)</button>
+                            <button class="filter-btn" onclick="filterEntries('template')">Templates (<span
+                                    id="countTemplate">0</span>)</button>
+                            <button class="filter-btn" onclick="filterEntries('manip')">Manipulators (<span
+                                    id="countManip">0</span>)</button>
+                            <button class="filter-btn" onclick="filterEntries('deleted')">Deleted (<span
+                                    id="countDeleted">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <div class="bulk-actions hidden" id="bulkActionsPanel">
+                        <div style="font-weight: 600; font-size: 0.9rem; margin-right: auto;">
+                            <span id="selectedCount">0</span> Selected
+                        </div>
+
+                        <select class="entry-select" id="bulkCategory" style="width: 150px;">
+                            <option value="">Set Category...</option>
+                            <option value="generic">Generic</option>
+                            <!-- filled dynamically -->
+                        </select>
+
+                        <select class="entry-select" id="bulkTrigger" style="width: 180px;">
+                            <option value="">Set Trigger...</option>
+                            <option value="EVENT_START_COND">Start/End Condition</option>
+                            <option value="EVENT_CMND_DOWN">Command Pressed</option>
+                            <option value="EVENT_CMND_UP">Command Released</option>
+                            <option value="EVENT_CMND_HOLD_STOP">Hold to Play</option>
+                            <option value="EVENT_CMND_HOLD_CUE">Press & Release Cue</option>
+                            <option value="CUE_TRIGGER_COND">Cue Trigger</option>
+                        </select>
+
+                        <button class="btn btn-secondary" onclick="applyBulkUpdate()"
+                            style="padding: 0.5rem 1rem; width: auto;">Apply</button>
                     </div>
                 </div>
 
@@ -1948,6 +2043,7 @@
         let currentDiffs = [];
         let currentFilename = 'aircraft_sounds.snd';
         let userCategories = [];
+        let searchText = '';
 
         // ========================================================================
         // CLASS DEFINITIONS
@@ -1971,6 +2067,8 @@
                 this.paramDrefIdx = data.paramDrefIdx !== undefined ? data.paramDrefIdx : null;
                 this.isTemplate = data.isTemplate || false;
                 this.comment = data.comment || '';
+                this.completed = data.completed || false;
+                this.selected = false;
             }
 
             toSND() {
@@ -2998,118 +3096,38 @@ documentation or community forums.
 
                 try {
                     results = updater.identifyChanges(commandMap);
-                } catch (e) {
-                    throw new Error("Failed to identify changes: " + e.message);
-                }
-
-                progressFill.style.width = '90%';
-
-                if (results.changes.length === 0) {
-                    log('No coordinate changes needed. Files match.', 'success', 'consoleUpdate');
-                    document.getElementById('updateBtn').disabled = false;
-                    progressFill.style.width = '100%';
-
-                    setTimeout(() => {
-                        progressBar.classList.add('hidden');
-                        progressFill.style.width = '0';
-                    }, 1500);
-                    return;
-                }
-
-                log(`Found ${results.changes.length} potential updates. Opening comparison...`, 'info', 'consoleUpdate');
-
-                try {
-                    openCompareModal(results.changes, results.totalEntries, results.matched, results.unmatched);
-                } catch (e) {
-                    throw new Error("Failed to open comparison view: " + e.message);
-                }
-
-                // Note: The workflow pauses here until user clicks "Finalize" in modal
-
-            } catch (error) {
-                console.error(error);
-                log('ERROR: ' + error.message, 'error', 'consoleUpdate');
-                if (error.stack) {
-                    console.error(error.stack);
-                    log('Stack: ' + error.stack.split('\n')[0], 'error', 'consoleUpdate');
-                }
-                progressFill.style.width = '0%';
-                setTimeout(() => progressBar.classList.add('hidden'), 500);
-                document.getElementById('updateBtn').disabled = false;
-            }
-        }
-
-        // ========================================================================
-        // REVIEW & CUSTOMIZE SYSTEM
-        // ========================================================================
-
-
-        function parseSNDToEntries(sndContent) {
-            const entries = [];
-            const lines = sndContent.split('\n');
-            let currentEntry = null;
-            let currentComment = '';
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-
-                if (trimmed.startsWith('#') && !trimmed.includes('=====')) {
-                    currentComment = trimmed.substring(1).trim();
-                    continue;
-                }
-
-                if (trimmed === 'BEGIN_SOUND_ATTACHMENT') {
-                    currentEntry = { comment: currentComment };
-                    currentComment = '';
-                } else if (trimmed === 'END_SOUND_ATTACHMENT') {
-                    if (currentEntry) {
-                        entries.push(new SoundEntry(currentEntry));
-                        currentEntry = null;
-                    }
-                } else if (currentEntry) {
-                    if (trimmed.startsWith('EVENT_NAME ')) {
-                        currentEntry.eventName = trimmed.substring(11);
-                        currentEntry.isTemplate = currentEntry.eventName.includes('aircraft/') ||
-                            currentEntry.eventName.includes('generic/');
-                    } else if (trimmed.startsWith('VEH_XYZ ')) {
-                        const parts = trimmed.substring(8).split(/\s+/);
-                        currentEntry.xyz = [parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])];
-                    } else if (trimmed.startsWith('EVENT_START_COND ')) {
-                        currentEntry.startCond = trimmed.substring(17);
-                        currentEntry.triggerType = 'EVENT_START_COND';
-                    } else if (trimmed.startsWith('EVENT_END_COND ')) {
-                        currentEntry.endCond = trimmed.substring(15);
-                    } else if (trimmed.startsWith('EVENT_CMND_DOWN ')) {
-                        currentEntry.command = trimmed.substring(16);
-                        currentEntry.triggerType = 'EVENT_CMND_DOWN';
-                    } else if (trimmed.startsWith('EVENT_CMND_UP ')) {
-                        currentEntry.command = trimmed.substring(14);
-                        currentEntry.triggerType = 'EVENT_CMND_UP';
-                    } else if (trimmed.startsWith('EVENT_CMND_HOLD_STOP ')) {
-                        currentEntry.command = trimmed.substring(21);
-                        currentEntry.triggerType = 'EVENT_CMND_HOLD_STOP';
-                    } else if (trimmed.startsWith('EVENT_CMND_HOLD_CUE ')) {
-                        currentEntry.command = trimmed.substring(20);
-                        currentEntry.triggerType = 'EVENT_CMND_HOLD_CUE';
-                    } else if (trimmed.startsWith('CUE_TRIGGER_COND ')) {
-                        currentEntry.cueTrigger = trimmed.substring(17);
-                        currentEntry.triggerType = 'CUE_TRIGGER_COND';
-                    } else if (trimmed.startsWith('EVENT_AUTO_END_FROM_START_COND ')) {
-                        currentEntry.autoEndCond = trimmed.substring(32);
-                    } else if (trimmed === 'EVENT_POLYPHONIC') {
-                        currentEntry.polyphonic = true;
-                    } else if (trimmed === 'EVENT_ALLOWED_FOR_AI') {
-                        currentEntry.allowedForAI = true;
-                    } else if (trimmed.startsWith('VEH_PART ')) {
-                        const parts = trimmed.substring(9).split(/\s+/);
-                        currentEntry.vehPart = `${parts[0]} ${parts[1]}`;
-                    } else if (trimmed.startsWith('PARAM_DREF_IDX ')) {
-                        currentEntry.paramDrefIdx = parseInt(trimmed.substring(15));
-                    }
+                    currentEntry.endCond = trimmed.substring(15);
+                } else if (trimmed.startsWith('EVENT_CMND_DOWN ')) {
+                    currentEntry.command = trimmed.substring(16);
+                    currentEntry.triggerType = 'EVENT_CMND_DOWN';
+                } else if (trimmed.startsWith('EVENT_CMND_UP ')) {
+                    currentEntry.command = trimmed.substring(14);
+                    currentEntry.triggerType = 'EVENT_CMND_UP';
+                } else if (trimmed.startsWith('EVENT_CMND_HOLD_STOP ')) {
+                    currentEntry.command = trimmed.substring(21);
+                    currentEntry.triggerType = 'EVENT_CMND_HOLD_STOP';
+                } else if (trimmed.startsWith('EVENT_CMND_HOLD_CUE ')) {
+                    currentEntry.command = trimmed.substring(20);
+                    currentEntry.triggerType = 'EVENT_CMND_HOLD_CUE';
+                } else if (trimmed.startsWith('CUE_TRIGGER_COND ')) {
+                    currentEntry.cueTrigger = trimmed.substring(17);
+                    currentEntry.triggerType = 'CUE_TRIGGER_COND';
+                } else if (trimmed.startsWith('EVENT_AUTO_END_FROM_START_COND ')) {
+                    currentEntry.autoEndCond = trimmed.substring(32);
+                } else if (trimmed === 'EVENT_POLYPHONIC') {
+                    currentEntry.polyphonic = true;
+                } else if (trimmed === 'EVENT_ALLOWED_FOR_AI') {
+                    currentEntry.allowedForAI = true;
+                } else if (trimmed.startsWith('VEH_PART ')) {
+                    const parts = trimmed.substring(9).split(/\s+/);
+                    currentEntry.vehPart = `${parts[0]} ${parts[1]}`;
+                } else if (trimmed.startsWith('PARAM_DREF_IDX ')) {
+                    currentEntry.paramDrefIdx = parseInt(trimmed.substring(15));
                 }
             }
+            }
 
-            return entries;
+        return entries;
         }
 
         // GENERATE MODE FUNCTION (same as before)
@@ -3297,22 +3315,124 @@ documentation or community forums.
         }
 
         function getFilteredEntries() {
+            let entries = soundEntries;
+
+            // Text Search
+            if (searchText) {
+                const lower = searchText.toLowerCase();
+                entries = entries.filter(e =>
+                    e.eventName.toLowerCase().includes(lower) ||
+                    e.comment.toLowerCase().includes(lower) ||
+                    e.command.toLowerCase().includes(lower) ||
+                    e.startCond.toLowerCase().includes(lower)
+                );
+            }
+
+            // Category/Status Filter
             switch (currentFilter) {
                 case 'template':
-                    return soundEntries.filter(e => e.isTemplate);
+                    return entries.filter(e => e.isTemplate);
                 case 'manip':
-                    return soundEntries.filter(e => !e.isTemplate);
+                    return entries.filter(e => !e.isTemplate);
                 case 'deleted':
-                    return soundEntries.filter(e => e.deleted);
+                    return entries.filter(e => e.deleted);
+                case 'pending':
+                    return entries.filter(e => !e.deleted && !e.completed);
+                case 'completed':
+                    return entries.filter(e => !e.deleted && e.completed);
                 case 'all':
                 default:
-                    return soundEntries;
+                    return entries;
             }
+        }
+
+        function updateSearch(val) {
+            searchText = val;
+            renderReviewModal();
+        }
+
+        function toggleEntryComplete(entryId, completed) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.completed = completed;
+                renderReviewModal();
+            }
+        }
+
+        function toggleEntrySelected(entryId, selected) {
+            const entry = soundEntries.find(e => e.id === entryId);
+            if (entry) {
+                entry.selected = selected;
+                updateBulkActionsUI();
+            }
+        }
+
+        function updateBulkActionsUI() {
+            const selectedCount = soundEntries.filter(e => e.selected).length;
+            document.getElementById('selectedCount').textContent = selectedCount;
+
+            const panel = document.getElementById('bulkActionsPanel');
+            if (selectedCount > 0) {
+                panel.classList.remove('hidden');
+
+                // Refresh categories in bulk dropdown
+                const bulkCat = document.getElementById('bulkCategory');
+                bulkCat.innerHTML = `<option value="">Set Category...</option>
+                                     <option value="generic">Generic</option>
+                                     ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}`;
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function applyBulkUpdate() {
+            const selectedEntries = soundEntries.filter(e => e.selected);
+            if (selectedEntries.length === 0) return;
+
+            const category = document.getElementById('bulkCategory').value;
+            const trigger = document.getElementById('bulkTrigger').value;
+
+            selectedEntries.forEach(entry => {
+                if (category) {
+                    updateEntryCategory(entry.id, category);
+                }
+                if (trigger) {
+                    entry.triggerType = trigger;
+                }
+            });
+
+            log(`Bulk updated ${selectedEntries.length} entries`, 'success');
+            renderReviewModal();
+        }
+
+        function updateReviewStats() {
+            const total = soundEntries.length;
+            const deleted = soundEntries.filter(e => e.deleted).length;
+            const active = total - deleted;
+            const template = soundEntries.filter(e => e.isTemplate && !e.deleted).length;
+            const manip = soundEntries.filter(e => !e.isTemplate && !e.deleted).length;
+            const pending = soundEntries.filter(e => !e.deleted && !e.completed).length;
+            const completed = soundEntries.filter(e => !e.deleted && e.completed).length;
+
+            document.getElementById('totalEntries').textContent = total;
+            document.getElementById('activeEntries').textContent = active;
+            document.getElementById('deletedEntries').textContent = deleted;
+            document.getElementById('countAll').textContent = total;
+            document.getElementById('countTemplate').textContent = template;
+            document.getElementById('countManip').textContent = manip;
+            document.getElementById('countDeleted').textContent = deleted;
+
+            // New counters
+            if (document.getElementById('countPending')) document.getElementById('countPending').textContent = pending;
+            if (document.getElementById('countCompleted')) document.getElementById('countCompleted').textContent = completed;
         }
 
         function createEntryCard(entry) {
             const card = document.createElement('div');
-            card.className = `sound-entry ${entry.deleted ? 'deleted' : ''}`;
+            const isCompleted = entry.completed;
+            const isSelected = entry.selected;
+
+            card.className = `sound-entry ${entry.deleted ? 'deleted' : ''} ${isCompleted ? 'completed' : ''}`;
             card.id = `entry-${entry.id}`;
 
             if (entry.deleted) {
@@ -3332,8 +3452,18 @@ documentation or community forums.
 
             card.innerHTML = `
                 <div class="entry-header">
-                    <div class="entry-title">${escapeHtml(entry.comment || entry.eventName)}</div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" class="entry-select-checkbox" 
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="toggleEntrySelected('${entry.id}', this.checked)">
+                        <div class="entry-title">${escapeHtml(entry.comment || entry.eventName)}</div>
+                    </div>
                     <div class="entry-controls">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; cursor: pointer; margin-right: 1rem;">
+                            <input type="checkbox" ${isCompleted ? 'checked' : ''} 
+                                   onchange="toggleEntryComplete('${entry.id}', this.checked)">
+                            Mark Complete
+                        </label>
                         <button class="entry-btn delete" onclick="deleteEntry('${entry.id}')">Delete</button>
                     </div>
                 </div>
@@ -3343,7 +3473,7 @@ documentation or community forums.
                         <label class="entry-label">Category</label>
                         <select class="entry-select" onchange="updateEntryCategory('${entry.id}', this.value)">
                             <option value="generic">Generic</option>
-                            ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            ${userCategories.map(c => `<option value="${c}" ${c === getCategoryFromEvent(entry.eventName) ? 'selected' : ''}>${c}</option>`).join('')}
                             <option value="custom">Custom (Type below)</option>
                         </select>
                     </div>
@@ -3399,6 +3529,13 @@ documentation or community forums.
             `;
 
             return card;
+        }
+
+        // Helper to extract category for pre-selection
+        function getCategoryFromEvent(eventName) {
+            const parts = eventName.split('/');
+            if (parts.length > 2) return parts[2];
+            return 'generic';
         }
 
         function getTriggerFields(entry) {
