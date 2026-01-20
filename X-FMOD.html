@@ -1467,6 +1467,16 @@
                         <input type="file" id="templateFile" accept=".snd" style="display: none;">
                         <div id="templateFileInfo" class="hidden"></div>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label">FMOD Project Folder (Optional)</label>
+                        <div class="drop-zone" id="fmodProjectDropZone">
+                            <div class="drop-text">Drop FMOD Project Folder here</div>
+                            <div class="drop-subtext">Parses events from Metadata folder</div>
+                        </div>
+                        <input type="file" id="fmodProjectFile" webkitdirectory directory style="display: none;">
+                        <div id="fmodProjectInfo" class="hidden"></div>
+                    </div>
                 </div>
 
                 <!-- Options Section -->
@@ -2030,6 +2040,9 @@
     </div>
 
     <script>
+        const fs = require('fs');
+        const path = require('path');
+
         // Global state
         let objFileContent = null;
         let templateFileContent = null;
@@ -4051,6 +4064,261 @@ documentation or community forums.
             }
             return entries;
         }
+        // ========================================================================
+        // FMOD PROJECT PARSING
+        // ========================================================================
+
+        const fmodProjectDropZone = document.getElementById('fmodProjectDropZone');
+        const fmodProjectFile = document.getElementById('fmodProjectFile');
+
+        // Drag and drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fmodProjectDropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fmodProjectDropZone.addEventListener(eventName, highlightFmod, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            fmodProjectDropZone.addEventListener(eventName, unhighlightFmod, false);
+        });
+
+        function highlightFmod() {
+            fmodProjectDropZone.classList.add('drag-over');
+        }
+
+        function unhighlightFmod() {
+            fmodProjectDropZone.classList.remove('drag-over');
+        }
+
+        fmodProjectDropZone.addEventListener('drop', handleFMODDrop, false);
+        fmodProjectDropZone.addEventListener('click', () => fmodProjectFile.click());
+        fmodProjectFile.addEventListener('change', handleFMODFileSelect);
+
+        function handleFMODDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                handleFMODProject(files[0].path);
+            }
+        }
+
+        function handleFMODFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                // For directory selection input, files[0] might be a file inside, need to get dir
+                // specific logic depends on standard input behavior, usually returns all files
+                // We'll trust the first file path and look for Metadata up the tree or assumes it is the root if dropped.
+                // But for webkitdirectory, files[0].path is full path to a file.
+                // However, we want the FOLDER path.
+                // If it's a drop, files[0].path is the folder path.
+                // If it's an input, we get a list of files.
+
+                // Let's rely on drop mostly, but for input:
+                let dirPath = '';
+                if (files[0].path) {
+                    // It's likely a file inside the directory
+                    // We need to find the root "Metadata" folder really.
+                    // For now let's assume the user selected the folder and try to deduce.
+                    // Actually webkitdirectory returns files, so we take the directory of the first file?
+                    // This creates ambiguity. Let's stick to Drop for now as primary or assume drop-like behavior.
+                    // Wait, handleFMODProject expects a folder path.
+                    handleFMODProject(files[0].path);
+                }
+            }
+        }
+
+        async function handleFMODProject(projectPath) {
+            const fmodInfo = document.getElementById('fmodProjectInfo');
+            const dropText = fmodProjectDropZone.querySelector('.drop-text');
+
+            // Check if it's a directory
+            try {
+                const stats = fs.statSync(projectPath);
+                if (!stats.isDirectory()) {
+                    log('Selected item is not a folder. Please drop the FMOD project folder.', 'error');
+                    return;
+                }
+
+                // Look for Metadata/Event
+                const eventDir = path.join(projectPath, 'Metadata', 'Event');
+                const eventFolderDir = path.join(projectPath, 'Metadata', 'EventFolder');
+
+                if (!fs.existsSync(eventDir)) {
+                    log('Could not find Metadata/Event folder. Is this a valid FMOD project?', 'error');
+                    return;
+                }
+
+                log(`Parsing FMOD project at: ${projectPath}`, 'info');
+
+                // Reset UI
+                fmodInfo.innerHTML = `<div>Scanning project...</div>`;
+                fmodInfo.classList.remove('hidden');
+
+                const events = parseFMODStructure(eventDir, eventFolderDir);
+
+                if (events.length > 0) {
+                    updateEventDropdown(events);
+
+                    dropText.textContent = path.basename(projectPath);
+                    fmodInfo.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">
+                                <span>📁 FMOD Project</span>
+                            </div>
+                            <div class="file-size">${events.length} events found</div>
+                            <button class="remove-btn" onclick="resetFMODProject(event)">×</button>
+                        </div>
+                    `;
+                    fmodProjectDropZone.classList.add('active');
+                    log(`Successfully loaded ${events.length} events from FMOD project.`, 'success');
+                } else {
+                    log('No events found in the project.', 'warning');
+                }
+
+            } catch (err) {
+                log('Error reading FMOD project: ' + err.message, 'error');
+                console.error(err);
+            }
+        }
+
+        function resetFMODProject(e) {
+            if (e) e.stopPropagation();
+            document.getElementById('fmodProjectDropZone').querySelector('.drop-text').textContent = 'Drop FMOD Project Folder here';
+            document.getElementById('fmodProjectInfo').classList.add('hidden');
+            document.getElementById('fmodProjectFile').value = '';
+
+            // Reset dropdown to defaults
+            const select = document.getElementById('eventName');
+            select.innerHTML = `
+                <option value="/aircraft/generic/switch">Generic Switch</option>
+                <option value="/aircraft/generic/knob">Generic Knob</option>
+                <option value="/aircraft/generic/button">Generic Button</option>
+                <option value="custom">Custom...</option>
+            `;
+            log('FMOD Project unloaded.', 'info');
+        }
+
+        function parseFMODStructure(eventDir, eventFolderDir) {
+            const folderMap = new Map(); // guid -> {name, parentGuid}
+            const eventMap = new Map();   // guid -> {name, folderGuid}
+
+            // 1. Parse Folders
+            if (fs.existsSync(eventFolderDir)) {
+                const folderFiles = fs.readdirSync(eventFolderDir).filter(f => f.endsWith('.xml'));
+
+                folderFiles.forEach(file => {
+                    const content = fs.readFileSync(path.join(eventFolderDir, file), 'utf8');
+                    const guidMatch = content.match(/<object class="EventFolder" id="\{([^}]+)\}"/);
+                    const nameMatch = content.match(/<property name="name">\s*<value>([^<]+)<\/value>/);
+                    const folderMatch = content.match(/<relationship name="folder">\s*<destination>\{([^}]+)\}<\/destination>/);
+
+                    if (guidMatch && nameMatch) {
+                        const guid = guidMatch[1];
+                        const name = nameMatch[1];
+                        const parentGuid = folderMatch ? folderMatch[1] : null;
+
+                        folderMap.set(guid, { name, parentGuid });
+                    }
+                });
+            }
+
+            // 2. Parse Events
+            const eventFiles = fs.readdirSync(eventDir).filter(f => f.endsWith('.xml'));
+
+            eventFiles.forEach(file => {
+                const content = fs.readFileSync(path.join(eventDir, file), 'utf8');
+                // Check if it is a folder proxy or actual event? 
+                // In FMOD 2.02, events are in Metadata/Event/{guid}.xml
+
+                const guidMatch = content.match(/<object class="Event" id="\{([^}]+)\}"/);
+                const nameMatch = content.match(/<property name="name">\s*<value>([^<]+)<\/value>/);
+                const folderMatch = content.match(/<relationship name="folder">\s*<destination>\{([^}]+)\}<\/destination>/);
+
+                if (guidMatch && nameMatch) {
+                    const guid = guidMatch[1];
+                    const name = nameMatch[1];
+                    const folderGuid = folderMatch ? folderMatch[1] : null;
+
+                    eventMap.set(guid, { name, folderGuid });
+                }
+            });
+
+            // 3. Build Full Paths
+            const eventPaths = [];
+
+            eventMap.forEach((event, guid) => {
+                let currentPath = event.name;
+                let currentFolderGuid = event.folderGuid;
+
+                // Walk up the folder tree
+                while (currentFolderGuid && folderMap.has(currentFolderGuid)) {
+                    const folder = folderMap.get(currentFolderGuid);
+                    currentPath = `${folder.name}/${currentPath}`;
+                    currentFolderGuid = folder.parentGuid;
+                }
+
+                // Add prefix
+                const fullPath = `event:/${currentPath}`;
+                eventPaths.push(fullPath);
+            });
+
+            return eventPaths.sort();
+        }
+
+        function updateEventDropdown(events) {
+            const select = document.getElementById('eventName');
+            select.innerHTML = '';
+
+            // Add default option
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = 'custom';
+            defaultOpt.textContent = 'Select an event...';
+            select.appendChild(defaultOpt);
+
+            // Group by top-level folder
+            const groups = {};
+
+            events.forEach(path => {
+                // event:/aircraft/category/name
+                const cleanPath = path.replace('event:/', '');
+                const parts = cleanPath.split('/');
+                const category = parts.length > 1 ? parts[0] : 'Uncategorized';
+
+                if (!groups[category]) groups[category] = [];
+                groups[category].push(path);
+            });
+
+            Object.keys(groups).sort().forEach(category => {
+                const optGroup = document.createElement('optgroup');
+                optGroup.label = category;
+
+                groups[category].forEach(path => {
+                    const option = document.createElement('option');
+                    option.value = path;
+                    // Show just the name or relative path for brevity?
+                    // Let's show full path for clarity but maybe shorten it
+                    option.textContent = path.replace('event:/', '');
+                    optGroup.appendChild(option);
+                });
+
+                select.appendChild(optGroup);
+            });
+
+            // Re-add custom
+            const customOpt = document.createElement('option');
+            customOpt.value = 'custom';
+            customOpt.textContent = 'Custom Manual Input...';
+            select.appendChild(customOpt);
+        }
+
         // Initialize Application
         document.addEventListener('DOMContentLoaded', () => {
             console.log('X-FMOD Initializing...');
