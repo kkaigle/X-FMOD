@@ -3153,7 +3153,17 @@ documentation or community forums.
                 const downloadBtn = document.getElementById('downloadBtn');
                 downloadBtn.classList.remove('hidden');
                 downloadBtn.textContent = 'Review & Customize';
-                downloadBtn.onclick = () => openReviewModal(outputFilename);
+
+                // Remove any existing listeners by cloning (optional but safe)
+                const newBtn = downloadBtn.cloneNode(true);
+                downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+
+                newBtn.onclick = function () {
+                    console.log('Button clicked! Opening modal for:', outputFilename);
+                    openReviewModal(outputFilename);
+                };
+
+                log(`Button enabled for output: ${outputFilename}`, 'info');
 
                 log(`Generated ${totalEntries} total sound entries - Click "Review & Customize" to edit`, 'info');
 
